@@ -39,7 +39,7 @@ export default async function DashboardPage() {
     }),
   ]);
 
-  const wonCount = recentResults.filter((p) => p.status === "WON").length;
+  const wonCount = recentResults.filter((p: { status: string }) => p.status === "WON").length;
   const winRate = recentResults.length > 0 ? Math.round((wonCount / recentResults.length) * 100) : 0;
 
   return (
