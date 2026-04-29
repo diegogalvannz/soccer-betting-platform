@@ -1,0 +1,118 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  createdAt        DateTime @default(now())
+  bankrollStart    Float    @default(0)
+  bankrollCurrent  Float    @default(0)
+  bets             Bet[]
+}
+
+model Team {
+  id          String  @id @default(uuid())
+  externalId  String  @unique
+  name        String
+  shortName   String?
+  logo        String?
+  leagueCode  String?
+  homeMatches Match[] @relation("HomeTeam")
+  awayMatches Match[] @relation("AwayTeam")
+}
+
+model Match {
+  id            String      @id @default(uuid())
+  externalId    String      @unique
+  homeTeamId    String
+  awayTeamId    String
+  homeTeam      Team        @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam      Team        @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  league        String
+  leagueCode    String
+  matchDate     DateTime
+  status        MatchStatus @default(SCHEDULED)
+  homeScore     Int?
+  awayScore     Int?
+  homeOdds      Float?
+  drawOdds      Float?
+  awayOdds      Float?
+  stats         Json?
+  rawOddsCache  Json?
+  oddsUpdatedAt DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  picks         Pick[]
+}
+
+model Pick {
+  id               String     @id @default(uuid())
+  matchId          String
+  match            Match      @relation(fields: [matchId], references: [id])
+  market           String
+  selection        String
+  odds             Float
+  americanOdds     Int
+  confidenceScore  Float
+  reasoning        String     @db.Text
+  sentimentSummary String?    @db.Text
+  status           PickStatus @default(PENDING)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  bets             Bet[]
+}
+
+model Bet {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  pickId    String
+  pick      Pick      @relation(fields: [pickId], references: [id])
+  stake     Float
+  odds      Float
+  result    BetResult @default(PENDING)
+  profit    Float?
+  notes     String?
+  createdAt DateTime  @default(now())
+  settledAt DateTime?
+}
+
+model Log {
+  id        String   @id @default(uuid())
+  type      String
+  message   String   @db.Text
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+  CANCELLED
+}
+
+enum PickStatus {
+  PENDING
+  WON
+  LOST
+  VOID
+  SKIPPED
+}
+
+enum BetResult {
+  PENDING
+  WON
+  LOST
+  VOID
+}
