@@ -96,7 +96,7 @@ export default async function DashboardPage() {
                 No picks yet — runs at 8am daily
               </p>
             ) : (
-              recentPicks.map((pick) => (
+              recentPicks.map((pick: typeof recentPicks[number]) => (
                 <Link key={pick.id} href={`/picks/${pick.id}`}>
                   <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors cursor-pointer">
                     <div>
