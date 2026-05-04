@@ -1,72 +1,115 @@
 /**
- * Match ingestion pipeline.
- * Pulls upcoming fixtures from Football-Data.org and upserts them into the DB.
- * Called by the /api/cron/ingest-matches cron job daily at 6am.
+ * Match ingestion pipeline — powered by API-Football (api-sports.io v3).
+ * Fetches upcoming + recent fixtures for all 24 tracked leagues and upserts
+ * them into the DB.  Called by /api/cron/ingest-matches daily at 00:40 UTC.
+ *
+ * Strategy:
+ *   - Per league: fetch last 3 days + next 7 days in one range call
+ *   - Batch 4 leagues concurrently to stay well within 7,500 req/day limit
+ *   - After ingest: auto-settle any newly-finished picks
  */
 import { prisma } from "@/lib/prisma";
-import { TRACKED_LEAGUES, FOOTBALL_DATA_DELAY_MS } from "@/config/leagues";
-import { getUpcomingMatches, getRecentMatches } from "./football-data-client";
-import { sleep } from "@/lib/utils";
-import { FootballDataMatch } from "@/types";
-import { settlePicks, updateFinishedMatchScores } from "@/modules/engine/settler";
+import {
+  getFixturesByDateRange,
+  LEAGUE_IDS,
+  LEAGUE_NAMES,
+  AFFixture,
+} from "./api-football-client";
+import { settlePicks } from "@/modules/engine/settler";
 
-function mapStatus(fdStatus: string): "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "CANCELLED" {
-  const map: Record<string, "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "CANCELLED"> = {
-    SCHEDULED: "SCHEDULED",
-    TIMED: "SCHEDULED",
-    IN_PLAY: "LIVE",
-    PAUSED: "LIVE",
-    FINISHED: "FINISHED",
-    AWARDED: "FINISHED",
-    POSTPONED: "POSTPONED",
-    SUSPENDED: "POSTPONED",
-    CANCELLED: "CANCELLED",
-  };
-  return map[fdStatus] ?? "SCHEDULED";
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SEASON = new Date().getFullYear();
+
+/** All league IDs we track (24 leagues) */
+const ALL_LEAGUE_IDS = Object.values(LEAGUE_IDS) as number[];
+
+// ─── Status mapping ───────────────────────────────────────────────────────────
+
+function mapStatus(
+  short: string
+): "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "CANCELLED" {
+  switch (short) {
+    case "NS":   return "SCHEDULED";
+    case "TBD":  return "SCHEDULED";
+    case "1H":
+    case "2H":
+    case "HT":
+    case "ET":
+    case "BT":
+    case "P":
+    case "INT":  return "LIVE";
+    case "FT":
+    case "AET":
+    case "PEN":  return "FINISHED";
+    case "AWD":
+    case "WO":   return "FINISHED";
+    case "PST":  return "POSTPONED";
+    case "SUSP": return "POSTPONED";
+    case "CANC": return "CANCELLED";
+    case "ABD":  return "CANCELLED";
+    default:     return "SCHEDULED";
+  }
 }
 
-async function upsertTeam(team: FootballDataMatch["homeTeam"]) {
+// ─── Upsert helpers ───────────────────────────────────────────────────────────
+
+async function upsertTeam(team: { id: number; name: string; logo?: string }) {
   return prisma.team.upsert({
-    where: { externalId: String(team.id) },
-    update: { name: team.name, shortName: team.shortName, logo: team.crest },
+    where:  { externalId: `af_${team.id}` },
+    update: { name: team.name, logo: team.logo ?? null },
     create: {
-      externalId: String(team.id),
-      name: team.name,
-      shortName: team.shortName,
-      logo: team.crest,
+      externalId: `af_${team.id}`,
+      name:       team.name,
+      shortName:  team.name,          // API-Football doesn't separate short names
+      logo:       team.logo ?? null,
     },
   });
 }
 
-async function upsertMatch(match: FootballDataMatch) {
-  const homeTeam = await upsertTeam(match.homeTeam);
-  const awayTeam = await upsertTeam(match.awayTeam);
+async function upsertFixture(f: AFFixture, leagueId: number) {
+  const [homeTeam, awayTeam] = await Promise.all([
+    upsertTeam(f.teams.home),
+    upsertTeam(f.teams.away),
+  ]);
 
-  const status = mapStatus(match.status);
-  const homeScore = match.score.fullTime.home;
-  const awayScore = match.score.fullTime.away;
+  const status    = mapStatus(f.fixture.status.short);
+  const homeScore = f.goals.home;
+  const awayScore = f.goals.away;
+  const externalId = String(f.fixture.id);
+  const leagueName = LEAGUE_NAMES[leagueId] ?? f.league.name;
 
   await prisma.match.upsert({
-    where: { externalId: String(match.id) },
+    where:  { externalId },
     update: {
       status,
       homeScore,
       awayScore,
-      matchDate: new Date(match.utcDate),
+      matchDate: new Date(f.fixture.date),
     },
     create: {
-      externalId: String(match.id),
+      externalId,
       homeTeamId: homeTeam.id,
       awayTeamId: awayTeam.id,
-      league: match.competition.name,
-      leagueCode: match.competition.code,
-      matchDate: new Date(match.utcDate),
+      league:     leagueName,
+      leagueCode: String(leagueId),
+      matchDate:  new Date(f.fixture.date),
       status,
       homeScore,
       awayScore,
     },
   });
 }
+
+// ─── Date range helpers ───────────────────────────────────────────────────────
+
+function dateStr(offsetDays: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
 
 export async function ingestUpcomingMatches(): Promise<{
   processed: number;
@@ -75,54 +118,51 @@ export async function ingestUpcomingMatches(): Promise<{
   let processed = 0;
   const errors: string[] = [];
 
-  for (const league of TRACKED_LEAGUES) {
-    try {
-      console.log(`[Ingest] Fetching upcoming matches for ${league.code}...`);
-      const matches = await getUpcomingMatches(league.code, 5);
+  const fromDate = dateStr(-3);   // 3 days ago (catch late-settled matches)
+  const toDate   = dateStr(7);    // 7 days ahead
 
-      for (const match of matches) {
+  // Process leagues in batches of 4 to stay safe on rate limits
+  const BATCH_SIZE = 4;
+  for (let i = 0; i < ALL_LEAGUE_IDS.length; i += BATCH_SIZE) {
+    const batch = ALL_LEAGUE_IDS.slice(i, i + BATCH_SIZE);
+
+    await Promise.all(
+      batch.map(async (leagueId) => {
         try {
-          await upsertMatch(match);
-          processed++;
+          console.log(`[Ingest] Fetching ${LEAGUE_NAMES[leagueId] ?? leagueId} (${fromDate} → ${toDate})...`);
+          const fixtures = await getFixturesByDateRange(
+            leagueId,
+            SEASON,
+            fromDate,
+            toDate
+          );
+
+          for (const f of fixtures) {
+            try {
+              await upsertFixture(f, leagueId);
+              processed++;
+            } catch (err) {
+              errors.push(`fixture ${f.fixture.id}: ${String(err)}`);
+            }
+          }
         } catch (err) {
-          errors.push(`Match ${match.id}: ${String(err)}`);
+          errors.push(`league ${leagueId}: ${String(err)}`);
         }
-      }
-
-      // Respect 10 req/min rate limit
-      await sleep(FOOTBALL_DATA_DELAY_MS);
-    } catch (err) {
-      errors.push(`League ${league.code}: ${String(err)}`);
-    }
+      })
+    );
   }
 
-  // Also update recently finished matches
-  for (const league of TRACKED_LEAGUES.slice(0, 3)) {
-    try {
-      const matches = await getRecentMatches(league.code, 7);
-      for (const match of matches) {
-        try {
-          await upsertMatch(match);
-        } catch {}
-      }
-      await sleep(FOOTBALL_DATA_DELAY_MS);
-    } catch {}
-  }
-
+  // Log to DB
   await prisma.log.create({
     data: {
-      type: "INGEST",
-      message: `Ingested ${processed} matches with ${errors.length} errors`,
-      meta: { errors },
+      type:    "INGEST",
+      message: `Ingested ${processed} fixtures from API-Football with ${errors.length} errors`,
+      meta:    { processed, errors: errors.slice(0, 20), fromDate, toDate },
     },
-  });
+  }).catch(() => {});
 
-  // Auto-settle: fetch scores for any stale matches then resolve pending picks
+  // Auto-settle: resolve any picks whose matches just became FINISHED
   try {
-    // First: fetch real scores from FD.org for any matches that should be finished
-    // (handles both real FD IDs and custom IDs via competition sweep)
-    await updateFinishedMatchScores();
-    // Then: settle all pending picks whose matches are now FINISHED
     const settlement = await settlePicks();
     if (settlement.settled > 0) {
       console.log(`[Ingest] Auto-settled ${settlement.settled} picks after ingest`);

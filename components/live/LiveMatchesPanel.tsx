@@ -174,7 +174,7 @@ export function LiveMatchesPanel() {
         {data.matches.map((m) => <LiveCard key={m.id} match={m} />)}
       </div>
       <p className="text-[10px] text-muted-foreground/40 mt-2">
-        API: {data.monthlyCallsUsed}/100 este mes · {data.source === "cache" ? "caché" : "en vivo"}
+        {data.totalLive} en vivo · {data.source === "live" ? "API-Football" : data.source === "error" ? "fuente BD" : "caché"} · actualiza cada 30s
       </p>
     </section>
   );
