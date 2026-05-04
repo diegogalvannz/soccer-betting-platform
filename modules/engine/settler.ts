@@ -5,6 +5,7 @@
  * Called by /api/cron/settle-picks at midnight.
  */
 import { prisma } from "@/lib/prisma";
+import { runPostMortem } from "@/modules/engine/learning";
 
 type PickWithMatch = {
   id: string;
@@ -264,6 +265,12 @@ export async function settlePicks(): Promise<{
       console.log(
         `[Settler] Pick ${pick.id} → ${pickResult} | ${pick.match.homeTeam.name} ${homeScore}-${awayScore} ${pick.match.awayTeam.name} | ${pick.selection}`
       );
+
+      // Trigger post-mortem learning for LOST picks (non-blocking)
+      if (pickResult === "LOST") {
+        runPostMortem(pick.id).catch(() => {});
+      }
+
       settled++;
     } catch (err) {
       errors.push(`Pick ${pick.id}: ${String(err)}`);

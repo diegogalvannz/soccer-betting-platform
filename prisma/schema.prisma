@@ -17,14 +17,15 @@ model User {
 }
 
 model Team {
-  id          String  @id @default(uuid())
-  externalId  String  @unique
-  name        String
-  shortName   String?
-  logo        String?
-  leagueCode  String?
-  homeMatches Match[] @relation("HomeTeam")
-  awayMatches Match[] @relation("AwayTeam")
+  id             String               @id @default(uuid())
+  externalId     String               @unique
+  name           String
+  shortName      String?
+  logo           String?
+  leagueCode     String?
+  homeMatches    Match[]              @relation("HomeTeam")
+  awayMatches    Match[]              @relation("AwayTeam")
+  weightOverride TeamWeightOverride?
 }
 
 model Match {
@@ -52,20 +53,21 @@ model Match {
 }
 
 model Pick {
-  id               String     @id @default(uuid())
+  id               String       @id @default(uuid())
   matchId          String
-  match            Match      @relation(fields: [matchId], references: [id])
+  match            Match        @relation(fields: [matchId], references: [id])
   market           String
   selection        String
   odds             Float
   americanOdds     Int
   confidenceScore  Float
-  reasoning        String     @db.Text
-  sentimentSummary String?    @db.Text
-  status           PickStatus @default(PENDING)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  reasoning        String       @db.Text
+  sentimentSummary String?      @db.Text
+  status           PickStatus   @default(PENDING)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
   bets             Bet[]
+  learningLog      LearningLog?
 }
 
 model Bet {
@@ -92,6 +94,37 @@ model Log {
 
   @@index([type])
   @@index([createdAt])
+}
+
+/**
+ * Post-mortem analysis generated when a pick is marked LOST.
+ * Captures what went wrong and feeds into future scoring adjustments.
+ */
+model LearningLog {
+  id           String   @id @default(uuid())
+  pickId       String   @unique
+  pick         Pick     @relation(fields: [pickId], references: [id])
+  // Human-readable explanation of what happened
+  whatHappened String   @db.Text
+  // Which factors were the main cause: { form: bool, h2h: bool, oddsValue: bool, homeAdvantage: bool }
+  wrongFactors Json
+  // Recommended weight deltas: { formDelta: -0.05, h2hDelta: +0.05, ... }
+  adjustments  Json
+  createdAt    DateTime @default(now())
+}
+
+/**
+ * Team-specific scoring weight overrides.
+ * Built up over time from LearningLog recommendations.
+ * If a team consistently beats our model, we adjust weights for future picks.
+ */
+model TeamWeightOverride {
+  id        String   @id @default(uuid())
+  teamId    String   @unique
+  team      Team     @relation(fields: [teamId], references: [id])
+  // Overrides merged on top of global weights: { formWeight: 0.3, h2hWeight: 0.25, ... }
+  weights   Json
+  updatedAt DateTime @updatedAt
 }
 
 enum MatchStatus {
