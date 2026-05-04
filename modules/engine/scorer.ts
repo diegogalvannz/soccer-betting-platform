@@ -83,13 +83,15 @@ export function scoreMatch(stats: MatchStats): ScoreResult {
     stats.newsScore * SCORING_WEIGHTS.news
   );
 
-  // Odds value component
+  const hasOdds = !!(stats.homeOdds && stats.awayOdds);
+
+  // Odds value component — when no odds, use neutral 0.5 so form/H2H still decide
   const homeOddsValue = stats.homeOdds
     ? valueScore(stats.homeOdds, rawHomeProb)
-    : 0.3;
+    : 0.5; // neutral — don't penalise missing odds
   const awayOddsValue = stats.awayOdds
     ? valueScore(stats.awayOdds, rawAwayProb)
-    : 0.3;
+    : 0.5;
 
   const homeTotal = rawHomeProb + homeOddsValue * SCORING_WEIGHTS.oddsValue;
   const awayTotal = rawAwayProb + awayOddsValue * SCORING_WEIGHTS.oddsValue;
@@ -104,6 +106,10 @@ export function scoreMatch(stats: MatchStats): ScoreResult {
   };
 
   // Decide pick direction
+  // Without odds: lower thresholds so form+H2H drive the pick
+  const winThreshold = hasOdds ? 0.60 : 0.50;
+  const gapThreshold = hasOdds ? 0.08 : 0.05;
+
   let pick: "HOME" | "AWAY" | "DRAW" | "SKIP";
   let decimalOdds: number;
   let selection: string;
@@ -111,16 +117,21 @@ export function scoreMatch(stats: MatchStats): ScoreResult {
 
   const gap = Math.abs(homeTotal - awayTotal);
 
-  if (homeTotal > awayTotal && homeTotal > 0.6 && gap > 0.08) {
+  if (homeTotal > awayTotal && homeTotal > winThreshold && gap > gapThreshold) {
     pick = "HOME";
-    decimalOdds = stats.homeOdds ?? 1.8;
+    decimalOdds = stats.homeOdds ?? 1.85;
     selection = stats.homeTeamName;
-    confidence = Math.round(homeTotal * 100);
-  } else if (awayTotal > homeTotal && awayTotal > 0.6 && gap > 0.08) {
+    // Scale confidence: with odds use raw total, without odds rescale [0.50–0.70] → [60–90]
+    confidence = hasOdds
+      ? Math.round(homeTotal * 100)
+      : Math.min(90, Math.round(60 + (homeTotal - winThreshold) / (0.70 - winThreshold) * 30));
+  } else if (awayTotal > homeTotal && awayTotal > winThreshold && gap > gapThreshold) {
     pick = "AWAY";
-    decimalOdds = stats.awayOdds ?? 2.1;
+    decimalOdds = stats.awayOdds ?? 2.20;
     selection = stats.awayTeamName;
-    confidence = Math.round(awayTotal * 100);
+    confidence = hasOdds
+      ? Math.round(awayTotal * 100)
+      : Math.min(90, Math.round(60 + (awayTotal - winThreshold) / (0.70 - winThreshold) * 30));
   } else {
     pick = "SKIP";
     decimalOdds = 1.0;
@@ -128,8 +139,8 @@ export function scoreMatch(stats: MatchStats): ScoreResult {
     confidence = 0;
   }
 
-  // Enforce odds floor
-  if (pick !== "SKIP" && decimalOdds < MIN_DECIMAL_ODDS) {
+  // Enforce odds floor (only when we have real odds)
+  if (pick !== "SKIP" && hasOdds && decimalOdds < MIN_DECIMAL_ODDS) {
     pick = "SKIP";
     confidence = 0;
   }

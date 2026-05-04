@@ -34,8 +34,11 @@ export async function getUpcomingMatches(
     .toISOString()
     .split("T")[0];
 
+  // NOTE: FD.org uses "TIMED" for matches with confirmed kick-off times.
+  // Do NOT filter by status=SCHEDULED — that misses most upcoming fixtures.
+  // Use dateFrom/dateTo only and let ingest handle all statuses.
   const data = await fetchFD<{ matches: FootballDataMatch[] }>(
-    `/competitions/${competitionCode}/matches?status=SCHEDULED&dateFrom=${dateFrom}&dateTo=${dateTo}`
+    `/competitions/${competitionCode}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`
   );
 
   await sleep(FOOTBALL_DATA_DELAY_MS);
