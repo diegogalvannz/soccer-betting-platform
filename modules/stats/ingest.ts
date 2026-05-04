@@ -8,7 +8,7 @@ import { TRACKED_LEAGUES, FOOTBALL_DATA_DELAY_MS } from "@/config/leagues";
 import { getUpcomingMatches, getRecentMatches } from "./football-data-client";
 import { sleep } from "@/lib/utils";
 import { FootballDataMatch } from "@/types";
-import { settlePicks } from "@/modules/engine/settler";
+import { settlePicks, updateFinishedMatchScores } from "@/modules/engine/settler";
 
 function mapStatus(fdStatus: string): "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "CANCELLED" {
   const map: Record<string, "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "CANCELLED"> = {
@@ -117,8 +117,12 @@ export async function ingestUpcomingMatches(): Promise<{
     },
   });
 
-  // Auto-settle: immediately resolve any pending picks whose matches just finished
+  // Auto-settle: fetch scores for any stale matches then resolve pending picks
   try {
+    // First: fetch real scores from FD.org for any matches that should be finished
+    // (handles both real FD IDs and custom IDs via competition sweep)
+    await updateFinishedMatchScores();
+    // Then: settle all pending picks whose matches are now FINISHED
     const settlement = await settlePicks();
     if (settlement.settled > 0) {
       console.log(`[Ingest] Auto-settled ${settlement.settled} picks after ingest`);
