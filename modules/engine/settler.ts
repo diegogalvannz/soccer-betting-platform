@@ -237,26 +237,89 @@ export async function settlePicks(): Promise<{
   return { settled, skipped, errors };
 }
 
+const FD_COMPETITIONS = ["PL", "BL1", "CL", "PD", "SA", "FL1", "DED", "PPL"];
+
+function normalizeTeamName(name: string | null | undefined): string {
+  if (!name) return "";
+  return name.toLowerCase().replace(/\./g, "").replace(/\s+/g, " ").trim();
+}
+
+function teamsMatch(fdName: string | null | undefined, dbName: string | null | undefined): boolean {
+  const fd = normalizeTeamName(fdName);
+  const db = normalizeTeamName(dbName);
+  if (!fd || !db) return false;
+  return fd === db || fd.includes(db.split(" ")[0]) || db.includes(fd.split(" ")[0]);
+}
+
+type FDMatchResult = {
+  id: number;
+  status: string;
+  utcDate: string;
+  homeTeam: { name: string };
+  awayTeam: { name: string };
+  score: { fullTime: { home: number | null; away: number | null } };
+};
+
+/**
+ * Fetch all recently finished matches from FD.org across tracked competitions.
+ * Used as a fallback for matches that don't have real FD match IDs.
+ */
+async function fetchRecentFinishedFromCompetitions(
+  apiKey: string,
+  daysBack = 7
+): Promise<FDMatchResult[]> {
+  const dateFrom = new Date(Date.now() - daysBack * 86400000).toISOString().split("T")[0];
+  const dateTo = new Date().toISOString().split("T")[0];
+  const all: FDMatchResult[] = [];
+
+  for (const comp of FD_COMPETITIONS) {
+    try {
+      const res = await fetch(
+        `https://api.football-data.org/v4/competitions/${comp}/matches?status=FINISHED&dateFrom=${dateFrom}&dateTo=${dateTo}`,
+        { headers: { "X-Auth-Token": apiKey } }
+      );
+      if (!res.ok) continue;
+      const data = await res.json() as { matches?: FDMatchResult[] };
+      all.push(...(data.matches ?? []));
+      await new Promise(r => setTimeout(r, 7000));
+    } catch {
+      // Non-fatal
+    }
+  }
+  return all;
+}
+
 /**
  * Also update match statuses from Football-Data.org for recently finished matches.
  * This ensures picks can be settled even if the ingest cron missed a result.
+ * Handles both real FD match IDs (numeric) and custom/fake IDs (by team name lookup).
  */
 export async function updateFinishedMatchScores(): Promise<void> {
   const FOOTBALL_DATA_API_KEY = process.env.FOOTBALL_DATA_API_KEY;
   if (!FOOTBALL_DATA_API_KEY) return;
 
-  // Find matches that should be finished (kickoff > 2.5 hours ago) but still SCHEDULED/LIVE
-  const cutoff = new Date(Date.now() - 2.5 * 60 * 60 * 1000);
+  // Find matches that should be finished (kickoff > 2 hours ago) but still SCHEDULED/LIVE
+  const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
   const staleMatches = await prisma.match.findMany({
     where: {
       status: { in: ["SCHEDULED", "LIVE"] },
       matchDate: { lt: cutoff },
     },
-    select: { id: true, externalId: true },
-    take: 10,
+    include: {
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+    },
+    take: 15,
   });
 
-  for (const match of staleMatches) {
+  if (staleMatches.length === 0) return;
+
+  // Separate: real FD IDs (numeric strings) vs custom/fake IDs
+  const realIdMatches = staleMatches.filter(m => /^\d+$/.test(m.externalId));
+  const fakeIdMatches = staleMatches.filter(m => !/^\d+$/.test(m.externalId));
+
+  // --- Strategy 1: direct match lookup for real FD IDs ---
+  for (const match of realIdMatches) {
     try {
       const res = await fetch(
         `https://api.football-data.org/v4/matches/${match.externalId}`,
@@ -279,12 +342,46 @@ export async function updateFinishedMatchScores(): Promise<void> {
             updatedAt: new Date(),
           },
         });
+        console.log(`[Settler] Updated score for match ${match.id}: ${data.score.fullTime.home}-${data.score.fullTime.away}`);
       }
 
-      // Respect rate limit
-      await new Promise((r) => setTimeout(r, 7000));
+      await new Promise(r => setTimeout(r, 7000));
     } catch {
       // Non-fatal, continue
+    }
+  }
+
+  // --- Strategy 2: competition sweep for matches with fake/custom IDs ---
+  if (fakeIdMatches.length > 0) {
+    console.log(`[Settler] ${fakeIdMatches.length} matches have custom IDs — fetching competition results...`);
+    const fdResults = await fetchRecentFinishedFromCompetitions(FOOTBALL_DATA_API_KEY);
+
+    for (const match of fakeIdMatches) {
+      const matchDate = new Date(match.matchDate);
+      const fdMatch = fdResults.find(fdm => {
+        const fdDate = new Date(fdm.utcDate);
+        const dayDiff = Math.abs(fdDate.getTime() - matchDate.getTime()) / 86400000;
+        return (
+          dayDiff <= 2 &&
+          teamsMatch(fdm.homeTeam.name, match.homeTeam.name) &&
+          teamsMatch(fdm.awayTeam.name, match.awayTeam.name)
+        );
+      });
+
+      if (fdMatch && fdMatch.status === "FINISHED") {
+        await prisma.match.update({
+          where: { id: match.id },
+          data: {
+            status: "FINISHED",
+            homeScore: fdMatch.score.fullTime.home,
+            awayScore: fdMatch.score.fullTime.away,
+            updatedAt: new Date(),
+          },
+        });
+        console.log(`[Settler] Resolved ${match.homeTeam.name} vs ${match.awayTeam.name}: ${fdMatch.score.fullTime.home}-${fdMatch.score.fullTime.away}`);
+      } else if (!fdMatch) {
+        console.log(`[Settler] No FD result found for ${match.homeTeam.name} vs ${match.awayTeam.name}`);
+      }
     }
   }
 }

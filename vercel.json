@@ -6,11 +6,11 @@
     },
     {
       "path": "/api/cron/generate-picks",
-      "schedule": "59 23 * * *"
+      "schedule": "40 0 * * *"
     },
     {
       "path": "/api/cron/settle-picks",
-      "schedule": "0 0 * * *"
+      "schedule": "0 */2 * * *"
     }
   ]
 }
