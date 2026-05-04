@@ -27,7 +27,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
         <Link href="/matches" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="text-2xl font-bold">Match Analysis</h1>
+        <h1 className="text-2xl font-bold">Análisis del Partido</h1>
       </div>
 
       {/* Match Header */}
@@ -38,7 +38,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
             <div className="flex items-center justify-center gap-6 my-4">
               <div className="text-center">
                 <p className="text-xl font-bold">{match.homeTeam.shortName ?? match.homeTeam.name}</p>
-                <p className="text-xs text-muted-foreground">Home</p>
+                <p className="text-xs text-muted-foreground">Local</p>
               </div>
               {match.status === "FINISHED" ? (
                 <div className="text-center">
@@ -53,7 +53,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
               )}
               <div className="text-center">
                 <p className="text-xl font-bold">{match.awayTeam.shortName ?? match.awayTeam.name}</p>
-                <p className="text-xs text-muted-foreground">Away</p>
+                <p className="text-xs text-muted-foreground">Visitante</p>
               </div>
             </div>
           </div>
@@ -63,12 +63,12 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
       {/* Odds */}
       {match.homeOdds && (
         <Card>
-          <CardHeader><CardTitle className="text-lg">Market Odds</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">Cuotas del Mercado</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-4 text-center">
               {[
                 { label: match.homeTeam.shortName ?? match.homeTeam.name, decimal: match.homeOdds },
-                { label: "Draw", decimal: match.drawOdds },
+                { label: "Empate", decimal: match.drawOdds },
                 { label: match.awayTeam.shortName ?? match.awayTeam.name, decimal: match.awayOdds },
               ].map(({ label, decimal }) => (
                 <div key={label} className="bg-accent rounded-lg p-3">
@@ -87,7 +87,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
       {/* Associated Picks */}
       {match.picks.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-lg">Generated Picks</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">Pronósticos Generados</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {match.picks.map((pick) => (
               <Link key={pick.id} href={`/picks/${pick.id}`}>
@@ -115,7 +115,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
       {match.picks.length === 0 && match.status === "SCHEDULED" && (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            No pick generated for this match yet. Picks run daily at 8am based on scoring thresholds.
+            Sin pronóstico generado para este partido aún. Los pronósticos se generan diariamente a las 00:40.
           </CardContent>
         </Card>
       )}

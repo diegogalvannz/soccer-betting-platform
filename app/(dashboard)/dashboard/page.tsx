@@ -77,46 +77,46 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Your betting intelligence overview</p>
+        <h1 className="text-3xl font-bold">Panel Principal</h1>
+        <p className="text-muted-foreground mt-1">Resumen de inteligencia de apuestas</p>
       </div>
 
       {/* Stats Row — 5 clickable cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatCard
-          title="Active Picks"
+          title="Pronósticos Activos"
           value={pendingPicksCount}
           icon={<Target className="h-4 w-4 text-muted-foreground" />}
-          description="Awaiting results"
+          description="Esperando resultados"
           href="/picks?status=PENDING"
         />
         <StatCard
-          title="Win Rate"
+          title="% de Aciertos"
           value={totalSettled > 0 ? `${winRate}%` : "—"}
           icon={<Trophy className="h-4 w-4 text-muted-foreground" />}
-          description={totalSettled > 0 ? `${wonCount}W / ${totalSettled - wonCount}L` : "No settled picks yet"}
+          description={totalSettled > 0 ? `${wonCount}G / ${totalSettled - wonCount}P` : "Sin pronósticos liquidados"}
           highlight={winRate >= 55}
           href="/analytics"
         />
         <StatCard
-          title="Upcoming"
+          title="Próximos"
           value={upcomingMatches.length}
           icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-          description="Next 48 hours"
+          description="Próximas 48 horas"
           href="/matches?filter=upcoming"
         />
         <StatCard
-          title="Total Picks"
+          title="Total Pronósticos"
           value={pendingPicksCount + totalSettled}
           icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
-          description="All time"
+          description="Historial completo"
           href="/picks"
         />
         <StatCard
-          title="Profit / ROI"
+          title="Ganancia / ROI"
           value={totalStaked > 0 ? profitDisplay : "—"}
           icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-          description={totalStaked > 0 ? `ROI: ${roi > 0 ? "+" : ""}${roi}%` : "No bets tracked yet"}
+          description={totalStaked > 0 ? `ROI: ${roi > 0 ? "+" : ""}${roi}%` : "Sin apuestas registradas aún"}
           highlight={totalProfit > 0}
           negative={totalProfit < 0}
           href="/analytics"
@@ -130,15 +130,15 @@ export default async function DashboardPage() {
         {/* Current Picks */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Active Picks</CardTitle>
+            <CardTitle className="text-lg">Pronósticos Activos</CardTitle>
             <Link href="/picks" className="text-sm text-primary hover:underline">
-              View all
+              Ver todos
             </Link>
           </CardHeader>
           <CardContent className="space-y-3">
             {recentPicks.length === 0 ? (
               <p className="text-muted-foreground text-sm text-center py-6">
-                No picks yet — runs at 8am daily
+                Sin pronósticos aún — se generan diariamente a las 00:40
               </p>
             ) : (
               recentPicks.map((pick: typeof recentPicks[number]) => (
@@ -169,15 +169,15 @@ export default async function DashboardPage() {
         {/* Upcoming Matches */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Upcoming Matches</CardTitle>
+            <CardTitle className="text-lg">Próximos Partidos</CardTitle>
             <Link href="/matches" className="text-sm text-primary hover:underline">
-              View all
+              Ver todos
             </Link>
           </CardHeader>
           <CardContent className="space-y-3">
             {upcomingMatches.length === 0 ? (
               <p className="text-muted-foreground text-sm text-center py-6">
-                No matches loaded — runs at 6am daily
+                Sin partidos cargados — se actualizan diariamente a las 6am
               </p>
             ) : (
               upcomingMatches.map((match: typeof upcomingMatches[number]) => (
@@ -202,8 +202,8 @@ export default async function DashboardPage() {
       </div>
 
       <p className="text-xs text-muted-foreground border border-border rounded-lg p-3">
-        ⚠️ This platform provides data-driven analysis only. All picks are single bets only.
-        Never bet more than you can afford to lose. Past performance does not guarantee future results.
+        ⚠️ Esta plataforma proporciona análisis basado en datos únicamente. Pronósticos generados por IA, apuestas simples, cuotas -200 o mejores.
+        Nunca apuestes más de lo que puedes permitirte perder. El rendimiento pasado no garantiza resultados futuros.
       </p>
     </div>
   );

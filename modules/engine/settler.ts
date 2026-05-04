@@ -36,8 +36,8 @@ function decidePickResult(
   const { market, selection } = pick;
   const totalGoals = homeScore + awayScore;
 
-  // 1X2 market
-  if (market === "1X2") {
+  // 1X2 / Match Winner market
+  if (market === "1X2" || market === "Match Winner") {
     if (selection.toLowerCase().includes("home") ||
         selection === pick.match.homeTeam.shortName ||
         selection === pick.match.homeTeam.name ||

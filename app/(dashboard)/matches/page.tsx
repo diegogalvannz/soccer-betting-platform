@@ -174,19 +174,19 @@ export default async function MatchesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Matches</h1>
-        <p className="text-muted-foreground mt-1">Upcoming fixtures and recent results</p>
+        <h1 className="text-3xl font-bold">Partidos</h1>
+        <p className="text-muted-foreground mt-1">Próximos partidos y resultados recientes</p>
       </div>
 
       {/* Upcoming */}
       <section>
         <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
-          Upcoming
+          Próximos
           <Badge variant="outline" className="text-xs">{upcoming.length}</Badge>
         </h2>
         {upcoming.length === 0 ? (
           <div className="rounded-xl border border-border bg-card py-12 text-center text-muted-foreground text-sm">
-            No upcoming matches — ingested daily at 6am
+            Sin partidos próximos — se actualizan diariamente a las 6am
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -201,7 +201,7 @@ export default async function MatchesPage() {
       {recent.length > 0 && (
         <section>
           <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
-            Recent Results
+            Resultados Recientes
             <Badge variant="outline" className="text-xs">{recent.length}</Badge>
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

@@ -42,7 +42,7 @@ export default async function PickDetailPage({ params }: { params: Promise<{ id:
         <Link href="/picks" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="text-2xl font-bold">Pick Detail</h1>
+        <h1 className="text-2xl font-bold">Detalle del Pronóstico</h1>
       </div>
 
       {/* Match Header */}
@@ -68,18 +68,18 @@ export default async function PickDetailPage({ params }: { params: Promise<{ id:
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            Recommendation
+            Recomendación
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Selection</p>
+              <p className="text-sm text-muted-foreground">Selección</p>
               <p className="text-xl font-bold">{pick.selection}</p>
               <p className="text-sm text-muted-foreground">{pick.market}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-muted-foreground">Odds</p>
+              <p className="text-sm text-muted-foreground">Cuota</p>
               <p className="text-2xl font-mono font-bold">{formatOdds(pick.americanOdds)}</p>
               <p className="text-xs text-muted-foreground">{pick.odds.toFixed(2)} decimal</p>
             </div>
@@ -87,11 +87,11 @@ export default async function PickDetailPage({ params }: { params: Promise<{ id:
 
           <div className="flex items-center gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Confidence</p>
+              <p className="text-sm text-muted-foreground">Confianza</p>
               <p className={`text-3xl font-bold ${confColor}`}>{pick.confidenceScore}/100</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Status</p>
+              <p className="text-sm text-muted-foreground">Estado</p>
               <span className={`text-sm px-3 py-1 rounded-full border ${STATUS_COLORS[pick.status] ?? STATUS_COLORS.VOID}`}>
                 {pick.status}
               </span>
@@ -101,7 +101,7 @@ export default async function PickDetailPage({ params }: { params: Promise<{ id:
           {/* Confidence bar */}
           <div>
             <div className="flex justify-between text-xs text-muted-foreground mb-1">
-              <span>Confidence Score</span>
+              <span>Puntaje de Confianza</span>
               <span>{pick.confidenceScore}/100</span>
             </div>
             <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -120,13 +120,13 @@ export default async function PickDetailPage({ params }: { params: Promise<{ id:
       {/* Reasoning */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Analysis & Reasoning</CardTitle>
+          <CardTitle className="text-lg">Análisis y Razonamiento</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm leading-relaxed text-muted-foreground">{pick.reasoning}</p>
           {pick.sentimentSummary && (
             <div className="mt-4 p-3 rounded-lg bg-accent">
-              <p className="text-xs font-medium text-muted-foreground mb-1">Sentiment</p>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Sentimiento</p>
               <p className="text-sm">{pick.sentimentSummary}</p>
             </div>
           )}
@@ -137,7 +137,7 @@ export default async function PickDetailPage({ params }: { params: Promise<{ id:
       {pick.match.homeOdds && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Market Odds</CardTitle>
+            <CardTitle className="text-lg">Cuotas del Mercado</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-4 text-center">
@@ -147,7 +147,7 @@ export default async function PickDetailPage({ params }: { params: Promise<{ id:
                 highlight={pick.selection === pick.match.homeTeam.name}
               />
               <OddsCell
-                label="Draw"
+                label="Empate"
                 value={pick.match.drawOdds}
                 highlight={pick.selection === "Draw"}
               />
@@ -167,7 +167,7 @@ export default async function PickDetailPage({ params }: { params: Promise<{ id:
       )}
 
       <p className="text-xs text-muted-foreground text-center">
-        Single bets only. This is data analysis — not financial advice. Never bet more than you can afford to lose.
+        Solo apuestas simples. Esto es análisis de datos — no es asesoramiento financiero. Nunca apuestes más de lo que puedes permitirte perder.
       </p>
     </div>
   );

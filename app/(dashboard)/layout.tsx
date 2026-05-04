@@ -14,11 +14,11 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/picks", label: "Picks", icon: Target },
-  { href: "/matches", label: "Matches", icon: Calendar },
-  { href: "/tracker", label: "Bet Tracker", icon: BookOpen },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/dashboard", label: "Panel Principal", icon: LayoutDashboard },
+  { href: "/picks", label: "Pronósticos", icon: Target },
+  { href: "/matches", label: "Partidos", icon: Calendar },
+  { href: "/tracker", label: "Registro de Apuestas", icon: BookOpen },
+  { href: "/analytics", label: "Analíticas", icon: BarChart3 },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -41,7 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span className="text-2xl">⚽</span>
             <div>
               <p className="font-bold text-sm leading-none">Soccer Intel</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Betting Platform</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Plataforma de Apuestas</p>
             </div>
           </div>
         </div>
@@ -74,7 +74,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent w-full transition-colors"
           >
             <LogOut className="h-4 w-4" />
-            Sign Out
+            Cerrar Sesión
           </button>
         </div>
       </aside>

@@ -33,6 +33,13 @@ const RESULT_COLORS: Record<string, string> = {
   VOID:    "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
+const RESULT_ES: Record<string, string> = {
+  PENDING: "PENDIENTE",
+  WON:     "GANADO",
+  LOST:    "PERDIDO",
+  VOID:    "NULO",
+};
+
 export default function TrackerPage() {
   const [bets, setBets] = useState<Bet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,16 +88,16 @@ export default function TrackerPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Bet Tracker</h1>
-        <p className="text-muted-foreground mt-1">All logged bets and results</p>
+        <h1 className="text-3xl font-bold">Registro de Apuestas</h1>
+        <p className="text-muted-foreground mt-1">Todas las apuestas registradas y resultados</p>
       </div>
 
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <SummaryCard label="Total Bets" value={bets.length} />
-        <SummaryCard label="Won" value={wonCount} positive />
-        <SummaryCard label="Lost" value={bets.filter((b) => b.result === "LOST").length} negative />
-        <SummaryCard label="Win Rate" value={settled.length > 0 ? `${winRate}%` : "—"} positive={winRate >= 50} />
+        <SummaryCard label="Total Apuestas" value={bets.length} />
+        <SummaryCard label="Ganadas" value={wonCount} positive />
+        <SummaryCard label="Perdidas" value={bets.filter((b) => b.result === "LOST").length} negative />
+        <SummaryCard label="% de Aciertos" value={settled.length > 0 ? `${winRate}%` : "—"} positive={winRate >= 50} />
         <SummaryCard
           label="Total P&L"
           value={`${totalProfit >= 0 ? "+" : ""}$${totalProfit.toFixed(2)}${roi ? ` (${Number(roi) >= 0 ? "+" : ""}${roi}%)` : ""}`}
@@ -101,25 +108,28 @@ export default function TrackerPage() {
 
       {/* Filter */}
       <div className="flex gap-2">
-        {(["ALL", "PENDING", "WON", "LOST"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
-              filter === f
-                ? "bg-primary text-primary-foreground border-primary"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {f === "ALL" ? `All (${bets.length})` : `${f} (${bets.filter((b) => b.result === f).length})`}
-          </button>
-        ))}
+        {(["ALL", "PENDING", "WON", "LOST"] as const).map((f) => {
+          const labels: Record<string, string> = { ALL: "Todas", PENDING: "Pendientes", WON: "Ganadas", LOST: "Perdidas" };
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+                filter === f
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {f === "ALL" ? `${labels[f]} (${bets.length})` : `${labels[f]} (${bets.filter((b) => b.result === f).length})`}
+            </button>
+          );
+        })}
       </div>
 
       {/* Bet List */}
       <Card>
         <CardHeader>
-          <CardTitle>Bets</CardTitle>
+          <CardTitle>Apuestas</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -127,8 +137,8 @@ export default function TrackerPage() {
           ) : displayed.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
               {bets.length === 0
-                ? "No bets logged yet. Go to a pick and click \"Log Bet\"."
-                : `No ${filter.toLowerCase()} bets.`}
+                ? "Sin apuestas registradas aún. Ve a un pronóstico y haz clic en \"Registrar Apuesta\"."
+                : `Sin apuestas ${filter === "PENDING" ? "pendientes" : filter === "WON" ? "ganadas" : filter === "LOST" ? "perdidas" : ""}.`}
             </p>
           ) : (
             <div className="space-y-3">
@@ -143,14 +153,14 @@ export default function TrackerPage() {
                         {bet.pick.match.homeTeam.name} vs {bet.pick.match.awayTeam.name}
                       </p>
                       <span className={`text-xs px-2 py-0.5 rounded-full border ${RESULT_COLORS[bet.result]}`}>
-                        {bet.result}
+                        {RESULT_ES[bet.result] ?? bet.result}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {bet.pick.selection} · {bet.pick.market} · {formatOdds(bet.pick.americanOdds)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Stake: ${bet.stake.toFixed(2)}
+                      Monto: ${bet.stake.toFixed(2)}
                       {bet.profit !== null && (
                         <span className={bet.profit >= 0 ? " text-green-400" : " text-red-400"}>
                           {" · "}P&L: {bet.profit >= 0 ? "+" : ""}${bet.profit.toFixed(2)}
@@ -170,7 +180,7 @@ export default function TrackerPage() {
                         disabled={settling === bet.id}
                         onClick={() => settleBet(bet.id, "WON")}
                       >
-                        Won
+                        Ganada
                       </Button>
                       <Button
                         size="sm"
@@ -179,7 +189,7 @@ export default function TrackerPage() {
                         disabled={settling === bet.id}
                         onClick={() => settleBet(bet.id, "LOST")}
                       >
-                        Lost
+                        Perdida
                       </Button>
                       <Button
                         size="sm"
@@ -188,7 +198,7 @@ export default function TrackerPage() {
                         disabled={settling === bet.id}
                         onClick={() => settleBet(bet.id, "VOID")}
                       >
-                        Void
+                        Nula
                       </Button>
                     </div>
                   )}

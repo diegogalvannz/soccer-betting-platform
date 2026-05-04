@@ -146,7 +146,7 @@ export default function AnalyticsPage() {
   }
 
   if (!data) {
-    return <div className="text-center py-16 text-muted-foreground">Failed to load analytics</div>;
+    return <div className="text-center py-16 text-muted-foreground">Error al cargar las analíticas</div>;
   }
 
   const hasData = data.totalPicks > 0;
@@ -156,52 +156,52 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Analytics</h1>
-        <p className="text-muted-foreground mt-1">Global app performance across all picks and bets</p>
+        <h1 className="text-3xl font-bold">Analíticas</h1>
+        <p className="text-muted-foreground mt-1">Rendimiento global de todos los pronósticos y apuestas</p>
       </div>
 
       {/* Pick KPIs */}
       <section>
-        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Pick Engine Performance</h2>
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Rendimiento del Motor de Pronósticos</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KPICard label="Total Picks Generated" value={String(data.totalPicks)} sub={`${data.pendingPicks} still pending`} />
+          <KPICard label="Total Pronósticos" value={String(data.totalPicks)} sub={`${data.pendingPicks} pendientes`} />
           <KPICard
-            label="Pick Win Rate"
+            label="% de Aciertos"
             value={data.wonPicks + data.lostPicks > 0 ? `${data.pickWinRate}%` : "—"}
-            sub={`${data.wonPicks}W · ${data.lostPicks}L · ${data.voidPicks} void`}
+            sub={`${data.wonPicks}G · ${data.lostPicks}P · ${data.voidPicks} nulos`}
             positive={data.pickWinRate >= 55}
             negative={data.pickWinRate > 0 && data.pickWinRate < 45}
           />
-          <KPICard label="Won" value={String(data.wonPicks)} positive={data.wonPicks > 0} />
-          <KPICard label="Lost" value={String(data.lostPicks)} negative={data.lostPicks > 0} />
+          <KPICard label="Ganados" value={String(data.wonPicks)} positive={data.wonPicks > 0} />
+          <KPICard label="Perdidos" value={String(data.lostPicks)} negative={data.lostPicks > 0} />
         </div>
       </section>
 
       {/* Bet KPIs */}
       <section>
-        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Betting Performance</h2>
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Rendimiento de Apuestas</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <KPICard
-            label="Total P&L"
+            label="Ganancia Total"
             value={data.totalBets > 0 ? (profitPositive ? `+$${data.totalProfit.toFixed(2)}` : `-$${Math.abs(data.totalProfit).toFixed(2)}`) : "—"}
-            sub={data.totalBets > 0 ? `$${data.totalStaked.toFixed(2)} staked` : "No bets yet"}
+            sub={data.totalBets > 0 ? `$${data.totalStaked.toFixed(2)} apostado` : "Sin apuestas aún"}
             positive={profitPositive && data.totalBets > 0}
             negative={!profitPositive && data.totalBets > 0}
           />
           <KPICard
             label="ROI"
             value={data.totalBets > 0 ? fmtROI(data.roi) : "—"}
-            sub="Return on investment"
+            sub="Retorno sobre inversión"
             positive={roiPositive && data.totalBets > 0}
             negative={!roiPositive && data.totalBets > 0}
           />
           <KPICard
-            label="Bet Win Rate"
+            label="% de Aciertos en Apuestas"
             value={data.wonBets + data.lostBets > 0 ? `${data.betWinRate}%` : "—"}
-            sub={`${data.wonBets}W · ${data.lostBets}L`}
+            sub={`${data.wonBets}G · ${data.lostBets}P`}
             positive={data.betWinRate >= 50}
           />
-          <KPICard label="Total Bets" value={String(data.totalBets)} sub={`${data.pendingBets} pending`} />
+          <KPICard label="Total de Apuestas" value={String(data.totalBets)} sub={`${data.pendingBets} pendientes`} />
         </div>
       </section>
 
@@ -209,17 +209,17 @@ export default function AnalyticsPage() {
       {data.performanceCurve.length >= 2 && (
         <Card>
           <CardHeader>
-            <CardTitle>Pick Performance Curve</CardTitle>
+            <CardTitle>Curva de Rendimiento</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground mb-3">Cumulative units won/lost over time (+1 per win, -1 per loss)</p>
+            <p className="text-xs text-muted-foreground mb-3">Unidades acumuladas ganadas/perdidas a lo largo del tiempo (+1 por acierto, -1 por fallo)</p>
             <PerformanceSpark curve={data.performanceCurve} />
             <div className="flex justify-between text-xs text-muted-foreground mt-2">
-              <span>Start</span>
+              <span>Inicio</span>
               <span className={data.performanceCurve.at(-1)!.cumulative >= 0 ? "text-green-400 font-medium" : "text-red-400 font-medium"}>
-                {data.performanceCurve.at(-1)!.cumulative >= 0 ? "+" : ""}{data.performanceCurve.at(-1)!.cumulative} units
+                {data.performanceCurve.at(-1)!.cumulative >= 0 ? "+" : ""}{data.performanceCurve.at(-1)!.cumulative} unidades
               </span>
-              <span>Now</span>
+              <span>Ahora</span>
             </div>
           </CardContent>
         </Card>
@@ -228,7 +228,7 @@ export default function AnalyticsPage() {
       {/* Monthly chart */}
       {data.monthlyBreakdown.length > 0 && (
         <Card>
-          <CardHeader><CardTitle>Monthly P&L</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Ganancia Mensual</CardTitle></CardHeader>
           <CardContent>
             <ROIChart data={data.monthlyBreakdown} />
           </CardContent>
@@ -241,7 +241,7 @@ export default function AnalyticsPage() {
           {/* By league */}
           {data.byLeague.length > 0 && (
             <Card>
-              <CardHeader><CardTitle className="text-base">Performance by League</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">Rendimiento por Liga</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 {data.byLeague.map((l) => (
                   <div key={l.league}>
@@ -259,7 +259,7 @@ export default function AnalyticsPage() {
           {/* By market */}
           {data.byMarket.length > 0 && (
             <Card>
-              <CardHeader><CardTitle className="text-base">Performance by Market</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">Rendimiento por Mercado</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 {data.byMarket.map((m) => (
                   <div key={m.market}>
@@ -279,14 +279,14 @@ export default function AnalyticsPage() {
       {/* Monthly breakdown table */}
       {data.monthlyBreakdown.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Monthly Breakdown</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Resumen Mensual</CardTitle></CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    {["Month", "Bets", "W/L", "P&L", "ROI"].map((h) => (
-                      <th key={h} className={`py-2 font-medium text-muted-foreground ${h === "Month" ? "text-left" : "text-right"}`}>{h}</th>
+                    {["Mes", "Apuestas", "G/P", "Ganancia", "ROI"].map((h) => (
+                      <th key={h} className={`py-2 font-medium text-muted-foreground ${h === "Mes" ? "text-left" : "text-right"}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -314,8 +314,8 @@ export default function AnalyticsPage() {
       {!hasData && (
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground">
-            <p>No picks generated yet.</p>
-            <p className="text-xs mt-2">Analytics will populate as picks are generated and results settled.</p>
+            <p>Sin pronósticos generados aún.</p>
+            <p className="text-xs mt-2">Las analíticas se poblarán conforme se generen pronósticos y se liquiden resultados.</p>
           </CardContent>
         </Card>
       )}

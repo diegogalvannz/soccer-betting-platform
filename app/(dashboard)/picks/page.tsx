@@ -14,6 +14,14 @@ const STATUS_COLORS: Record<string, string> = {
   SKIPPED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
 };
 
+const STATUS_ES: Record<string, string> = {
+  PENDING: "PENDIENTE",
+  WON:     "GANADO",
+  LOST:    "PERDIDO",
+  VOID:    "NULO",
+  SKIPPED: "OMITIDO",
+};
+
 export default async function PicksPage() {
   const picks = await prisma.pick.findMany({
     include: {
@@ -34,22 +42,22 @@ export default async function PicksPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Picks</h1>
+        <h1 className="text-3xl font-bold">Pronósticos</h1>
         <p className="text-muted-foreground mt-1">
-          AI-generated picks — single bets only — odds -200 or better
+          Pronósticos generados por IA — apuestas simples — cuotas -200 o mejores
         </p>
       </div>
 
       {/* Active Picks */}
       <section>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          Active Picks
+          Pronósticos Activos
           <Badge variant="outline">{pending.length}</Badge>
         </h2>
         {pending.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
-              No active picks right now. Picks are generated daily at 8am.
+              Sin pronósticos activos. Se generan diariamente a las 00:40.
             </CardContent>
           </Card>
         ) : (
@@ -64,7 +72,7 @@ export default async function PicksPage() {
       {/* Settled Picks */}
       {settled.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-4">Past Picks</h2>
+          <h2 className="text-lg font-semibold mb-4">Historial de Pronósticos</h2>
           <div className="grid gap-3">
             {settled.map((pick) => (
               <PickRow key={pick.id} pick={pick} />
@@ -112,11 +120,11 @@ function PickRow({ pick }: PickRowProps) {
                   {pick.match.awayTeam.shortName ?? pick.match.awayTeam.name}
                 </p>
                 <span className={`text-xs px-2 py-0.5 rounded-full border ${statusColor}`}>
-                  {pick.status}
+                  {STATUS_ES[pick.status] ?? pick.status}
                 </span>
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Pick: <span className="text-foreground font-medium">{pick.selection}</span>
+                Pronóstico: <span className="text-foreground font-medium">{pick.selection}</span>
                 {" · "}
                 {pick.market}
                 {" · "}
@@ -129,11 +137,11 @@ function PickRow({ pick }: PickRowProps) {
             <div className="flex items-center gap-4 ml-4">
               <div className="text-right">
                 <p className="font-mono font-bold">{formatOdds(pick.americanOdds)}</p>
-                <p className="text-xs text-muted-foreground">odds</p>
+                <p className="text-xs text-muted-foreground">cuota</p>
               </div>
               <div className="text-right">
                 <p className={`font-bold ${confColor}`}>{pick.confidenceScore}</p>
-                <p className="text-xs text-muted-foreground">conf</p>
+                <p className="text-xs text-muted-foreground">conf.</p>
               </div>
             </div>
           </div>

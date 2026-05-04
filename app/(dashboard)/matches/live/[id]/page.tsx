@@ -69,7 +69,7 @@ function ScoreHeader({
         </span>
         <div className="flex items-center gap-2">
           <PulsingDot />
-          <span className="text-xs font-bold text-red-500 uppercase tracking-wider">Live</span>
+          <span className="text-xs font-bold text-red-500 uppercase tracking-wider">En Vivo</span>
         </div>
       </div>
 
@@ -138,22 +138,22 @@ function FormRow({ homeForm, awayForm }: { homeForm: TeamForm[]; awayForm: TeamF
     <div className="bg-card border border-border rounded-xl px-4 py-3">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <p className="text-xs text-muted-foreground mb-2 font-medium">Home Form</p>
+          <p className="text-xs text-muted-foreground mb-2 font-medium">Forma Local</p>
           <div className="flex gap-1">
             {homeForm.length > 0 ? (
               homeForm.map((f, i) => <FormBadge key={i} result={f.result} />)
             ) : (
-              <span className="text-xs text-muted-foreground">No data</span>
+              <span className="text-xs text-muted-foreground">Sin datos</span>
             )}
           </div>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground mb-2 font-medium">Away Form</p>
+          <p className="text-xs text-muted-foreground mb-2 font-medium">Forma Visitante</p>
           <div className="flex gap-1">
             {awayForm.length > 0 ? (
               awayForm.map((f, i) => <FormBadge key={i} result={f.result} />)
             ) : (
-              <span className="text-xs text-muted-foreground">No data</span>
+              <span className="text-xs text-muted-foreground">Sin datos</span>
             )}
           </div>
         </div>
@@ -168,9 +168,9 @@ type Tab = "facts" | "stats" | "lineup" | "h2h";
 
 function TabBar({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   const tabs: { id: Tab; label: string }[] = [
-    { id: "facts", label: "Facts" },
-    { id: "stats", label: "Stats" },
-    { id: "lineup", label: "Lineup" },
+    { id: "facts", label: "Eventos" },
+    { id: "stats", label: "Estadísticas" },
+    { id: "lineup", label: "Alineación" },
     { id: "h2h", label: "Head to Head" },
   ];
   return (
@@ -212,10 +212,10 @@ function FactsTab({ match }: { match: LiveMatchDetail }) {
       <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
         <Zap className="h-4 w-4 text-primary shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-medium">Live Events — Upgrading Soon</p>
+          <p className="text-sm font-medium">Eventos en Vivo — Próximamente</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Goal scorers, assists, yellow cards, and substitutions require our premium data feed.
-            Detailed events will appear here automatically once enabled.
+            Goles, asistencias, tarjetas amarillas y sustituciones requieren nuestro feed de datos premium.
+            Los eventos detallados aparecerán aquí automáticamente una vez habilitados.
           </p>
         </div>
       </div>
@@ -235,7 +235,7 @@ function FactsTab({ match }: { match: LiveMatchDetail }) {
 
       {/* Timeline skeleton showing what it will look like */}
       <div className="space-y-2 opacity-40 pointer-events-none select-none" aria-hidden>
-        <p className="text-xs text-muted-foreground px-1 font-medium">Preview (sample events)</p>
+        <p className="text-xs text-muted-foreground px-1 font-medium">Vista previa (eventos de ejemplo)</p>
         {[
           { icon: "⚽", min: "23'", text: "Goal — Striker Name (Assist: Midfielder)", color: "border-green-500/30 bg-green-500/5" },
           { icon: "🟡", min: "37'", text: "Yellow Card — Defender Name", color: "border-yellow-500/30 bg-yellow-500/5" },
@@ -302,7 +302,7 @@ function StatsTab({ match }: { match: LiveMatchDetail }) {
           <div className="w-3 h-1.5 rounded-full bg-blue-500" />
           <span>{match.homeTeam.split(" ")[0]}</span>
         </div>
-        <span className="font-medium">Statistics</span>
+        <span className="font-medium">Estadísticas</span>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-1.5 rounded-full bg-orange-500" />
           <span>{match.awayTeam.split(" ")[0]}</span>
@@ -311,16 +311,16 @@ function StatsTab({ match }: { match: LiveMatchDetail }) {
 
       {/* Live stats (from what we have) */}
       <div className="space-y-4">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Available Now</p>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Disponible Ahora</p>
         <StatBar
-          label="Goals"
+          label="Goles"
           home={match.homeScore}
           away={match.awayScore}
           homeVal={match.homeScore}
           awayVal={match.awayScore}
         />
         <StatBar
-          label="Red Cards"
+          label="Tarj. Rojas"
           home={match.homeRedCards || 0}
           away={match.awayRedCards || 0}
           homeVal={match.homeRedCards}
@@ -332,24 +332,24 @@ function StatsTab({ match }: { match: LiveMatchDetail }) {
       <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
         <Zap className="h-4 w-4 text-primary shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-medium">Detailed Stats — Upgrading Soon</p>
+          <p className="text-sm font-medium">Estadísticas Detalladas — Próximamente</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Possession, shots, corners, fouls, passes, and attacks require our premium data feed.
+            Posesión, tiros, córneres, faltas, pases y ataques requieren nuestro feed de datos premium.
           </p>
         </div>
       </div>
 
       <div className="space-y-4">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Coming Soon</p>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Próximamente</p>
         {[
-          { label: "Ball Possession", home: "52%", away: "48%", homeVal: 52, awayVal: 48 },
-          { label: "Total Shots", home: "8", away: "5", homeVal: 8, awayVal: 5 },
-          { label: "Shots on Target", home: "4", away: "2", homeVal: 4, awayVal: 2 },
-          { label: "Corners", home: "5", away: "3", homeVal: 5, awayVal: 3 },
-          { label: "Fouls", home: "11", away: "14", homeVal: 11, awayVal: 14 },
-          { label: "Yellow Cards", home: "2", away: "3", homeVal: 2, awayVal: 3 },
-          { label: "Offsides", home: "2", away: "1", homeVal: 2, awayVal: 1 },
-          { label: "Passes", home: "312", away: "278", homeVal: 312, awayVal: 278 },
+          { label: "Posesión", home: "52%", away: "48%", homeVal: 52, awayVal: 48 },
+          { label: "Tiros Totales", home: "8", away: "5", homeVal: 8, awayVal: 5 },
+          { label: "Tiros a Portería", home: "4", away: "2", homeVal: 4, awayVal: 2 },
+          { label: "Córneres", home: "5", away: "3", homeVal: 5, awayVal: 3 },
+          { label: "Faltas", home: "11", away: "14", homeVal: 11, awayVal: 14 },
+          { label: "Tarj. Amarillas", home: "2", away: "3", homeVal: 2, awayVal: 3 },
+          { label: "Fueras de Lugar", home: "2", away: "1", homeVal: 2, awayVal: 1 },
+          { label: "Pases", home: "312", away: "278", homeVal: 312, awayVal: 278 },
         ].map((s) => (
           <StatBar key={s.label} premium {...s} />
         ))}
@@ -366,10 +366,10 @@ function LineupTab({ match }: { match: LiveMatchDetail }) {
       <div className="flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
         <Zap className="h-4 w-4 text-primary shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-medium">Lineups — Upgrading Soon</p>
+          <p className="text-sm font-medium">Alineaciones — Próximamente</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Starting XIs, formations, and substitutes require our premium data feed.
-            Lineups are typically confirmed 1 hour before kickoff.
+            Titulares, formaciones y suplentes requieren nuestro feed de datos premium.
+            Las alineaciones se confirman normalmente 1 hora antes del partido.
           </p>
         </div>
       </div>
@@ -426,8 +426,8 @@ function LineupTab({ match }: { match: LiveMatchDetail }) {
         {/* Overlay blur */}
         <div className="absolute inset-0 backdrop-blur-[1px] flex items-center justify-center">
           <div className="text-center space-y-1 bg-black/60 rounded-xl px-6 py-4">
-            <p className="text-sm font-semibold">Lineup Not Available</p>
-            <p className="text-xs text-muted-foreground">Upgrading soon</p>
+            <p className="text-sm font-semibold">Alineación No Disponible</p>
+            <p className="text-xs text-muted-foreground">Próximamente</p>
           </div>
         </div>
       </div>
@@ -447,9 +447,9 @@ function H2HTab({
   if (h2h.length === 0) {
     return (
       <div className="text-center py-12 space-y-2">
-        <p className="text-muted-foreground text-sm">No head-to-head history found</p>
+        <p className="text-muted-foreground text-sm">Sin historial de enfrentamientos directos</p>
         <p className="text-xs text-muted-foreground/60">
-          These teams haven&apos;t played each other in our tracked leagues yet.
+          Estos equipos no se han enfrentado en las ligas que seguimos aún.
         </p>
       </div>
     );
@@ -473,15 +473,15 @@ function H2HTab({
       <div className="grid grid-cols-3 text-center bg-card border border-border rounded-xl divide-x divide-border overflow-hidden">
         <div className="py-3">
           <p className="text-2xl font-black text-blue-400">{homeWins}</p>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate px-2">{match.homeTeam.split(" ")[0]} Wins</p>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate px-2">{match.homeTeam.split(" ")[0]} Victorias</p>
         </div>
         <div className="py-3">
           <p className="text-2xl font-black text-muted-foreground">{draws}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Draws</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Empates</p>
         </div>
         <div className="py-3">
           <p className="text-2xl font-black text-orange-400">{awayWins}</p>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate px-2">{match.awayTeam.split(" ")[0]} Wins</p>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate px-2">{match.awayTeam.split(" ")[0]} Victorias</p>
         </div>
       </div>
 
@@ -571,15 +571,15 @@ export default function LiveMatchPage() {
     return (
       <div className="space-y-4">
         <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+          <ArrowLeft className="h-4 w-4" /> Volver al Panel
         </Link>
         <div className="text-center py-16">
           <p className="text-muted-foreground">{error}</p>
           <p className="text-xs text-muted-foreground/60 mt-2">
-            The match may have finished or is not currently live.
+            Es posible que el partido haya terminado o no esté en vivo actualmente.
           </p>
           <Link href="/dashboard" className="mt-4 inline-block text-sm text-primary hover:underline">
-            Return to Dashboard
+            Volver al Panel Principal
           </Link>
         </div>
       </div>
@@ -589,7 +589,7 @@ export default function LiveMatchPage() {
   if (!match) return (
     <div className="space-y-4">
       <Link href="/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="h-4 w-4" /> Back
+        <ArrowLeft className="h-4 w-4" /> Volver
       </Link>
       <LoadingSkeleton />
     </div>
@@ -603,14 +603,14 @@ export default function LiveMatchPage() {
           href="/dashboard"
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" /> Live Matches
+          <ArrowLeft className="h-4 w-4" /> Partidos en Vivo
         </Link>
         <p className="text-xs text-muted-foreground/60">
           {lastUpdated
             ? secondsSince === 0
-              ? "Just updated"
-              : `Updated ${secondsSince}s ago`
-            : "Loading…"}
+              ? "Actualizado ahora"
+              : `Actualizado hace ${secondsSince}s`
+            : "Cargando…"}
         </p>
       </div>
 
@@ -633,7 +633,7 @@ export default function LiveMatchPage() {
 
       {/* Footer */}
       <p className="text-[10px] text-center text-muted-foreground/40">
-        API call {match.monthlyCallsUsed}/100 this month · Refreshes every 10 min · Page polls every 3s
+        Llamada API {match.monthlyCallsUsed}/100 este mes · Se actualiza cada 10 min · Página sondea cada 3s
       </p>
     </div>
   );

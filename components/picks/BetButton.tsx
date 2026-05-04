@@ -20,7 +20,7 @@ export function BetButton({ pickId, odds, americanOdds }: Props) {
   async function handleLogBet() {
     const stakeVal = parseFloat(stake);
     if (!stakeVal || stakeVal <= 0) {
-      toast.error("Enter a valid stake amount");
+      toast.error("Ingresa un monto válido");
       return;
     }
 
@@ -29,7 +29,7 @@ export function BetButton({ pickId, odds, americanOdds }: Props) {
       // Get userId from session (simplified — use localStorage as fallback)
       const userId = localStorage.getItem("userId");
       if (!userId) {
-        toast.error("Please sign in to log bets");
+        toast.error("Inicia sesión para registrar apuestas");
         setLoading(false);
         return;
       }
@@ -41,10 +41,10 @@ export function BetButton({ pickId, odds, americanOdds }: Props) {
       });
 
       if (!res.ok) throw new Error("Failed to log bet");
-      toast.success(`Bet logged: $${stakeVal} to win $${potentialProfit.toFixed(2)}`);
+      toast.success(`Apuesta registrada: $${stakeVal} para ganar $${potentialProfit.toFixed(2)}`);
       setLogged(true);
     } catch {
-      toast.error("Failed to log bet");
+      toast.error("Error al registrar la apuesta");
     }
     setLoading(false);
   }
@@ -53,7 +53,7 @@ export function BetButton({ pickId, odds, americanOdds }: Props) {
     return (
       <Card className="border-green-500/30">
         <CardContent className="py-4 text-center text-green-400 font-medium">
-          ✓ Bet logged successfully
+          ✓ Apuesta registrada correctamente
         </CardContent>
       </Card>
     );
@@ -62,11 +62,11 @@ export function BetButton({ pickId, odds, americanOdds }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Log This Bet</CardTitle>
+        <CardTitle className="text-lg">Registrar Apuesta</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="stake">Stake Amount ($)</Label>
+          <Label htmlFor="stake">Monto a Apostar ($)</Label>
           <Input
             id="stake"
             type="number"
@@ -78,11 +78,11 @@ export function BetButton({ pickId, odds, americanOdds }: Props) {
           />
         </div>
         <div className="flex justify-between text-sm text-muted-foreground">
-          <span>Odds: {formatOdds(americanOdds)}</span>
-          <span>Potential profit: <span className="text-green-400 font-medium">${potentialProfit.toFixed(2)}</span></span>
+          <span>Cuota: {formatOdds(americanOdds)}</span>
+          <span>Ganancia potencial: <span className="text-green-400 font-medium">${potentialProfit.toFixed(2)}</span></span>
         </div>
         <Button onClick={handleLogBet} disabled={loading} className="w-full">
-          {loading ? "Logging..." : "Log Bet"}
+          {loading ? "Registrando..." : "Registrar Apuesta"}
         </Button>
       </CardContent>
     </Card>

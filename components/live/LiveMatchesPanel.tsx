@@ -4,6 +4,26 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { LiveMatch, LiveMatchesResponse } from "@/app/api/live-matches/route";
+import { getJerseyColor } from "@/lib/jersey-colors";
+
+function JerseyIcon({ color, size = 32 }: { color: string; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 36 40"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <path d="M13 2 Q18 7 23 2" stroke={color} strokeWidth="2" strokeLinecap="round" fill="none" />
+      <path d="M13 2 L4 10 L8 14 L13 10" fill={color} stroke={color} strokeWidth="0.5" strokeLinejoin="round" />
+      <path d="M23 2 L32 10 L28 14 L23 10" fill={color} stroke={color} strokeWidth="0.5" strokeLinejoin="round" />
+      <path d="M13 2 Q12 8 11 10 L10 38 L26 38 L25 10 Q24 8 23 2 Q18 7 13 2Z" fill={color} stroke={color} strokeWidth="0.5" strokeLinejoin="round" />
+      <path d="M17 12 L17 36" stroke="rgba(0,0,0,0.12)" strokeWidth="1" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 const POLL_INTERVAL_MS = 30_000; // frontend polls every 30 seconds
 
@@ -45,7 +65,7 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <PulsingDot />
-          <span className="text-xs font-bold text-red-500 uppercase tracking-wider">Live</span>
+          <span className="text-xs font-bold text-red-500 uppercase tracking-wider">En Vivo</span>
         </div>
         <div className="text-right">
           <span className="text-sm font-bold tabular-nums">{match.minute}</span>
@@ -56,11 +76,12 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
       {/* Teams + Score */}
       <div className="grid grid-cols-3 items-center gap-2 mb-4">
         {/* Home */}
-        <div className="text-right">
-          <p className="font-semibold text-sm leading-tight">
+        <div className="flex flex-col items-center gap-1">
+          <JerseyIcon color={getJerseyColor(match.homeTeam)} size={30} />
+          <p className="font-semibold text-xs leading-tight text-center line-clamp-2">
             {match.homeTeam}
-            <RedCardBadge count={match.homeRedCards} />
           </p>
+          <RedCardBadge count={match.homeRedCards} />
         </div>
 
         {/* Score */}
@@ -71,11 +92,12 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
         </div>
 
         {/* Away */}
-        <div className="text-left">
-          <p className="font-semibold text-sm leading-tight">
-            <RedCardBadge count={match.awayRedCards} />
+        <div className="flex flex-col items-center gap-1">
+          <JerseyIcon color={getJerseyColor(match.awayTeam)} size={30} />
+          <p className="font-semibold text-xs leading-tight text-center line-clamp-2">
             {match.awayTeam}
           </p>
+          <RedCardBadge count={match.awayRedCards} />
         </div>
       </div>
 
@@ -83,13 +105,13 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
       <div className="border-t border-border/50 pt-3 mt-3 space-y-0.5">
         <div className="grid grid-cols-3 text-[10px] font-medium text-muted-foreground mb-1">
           <span className="text-right">{match.homeTeam.split(" ")[0]}</span>
-          <span className="text-center">Stats</span>
+          <span className="text-center">Estad.</span>
           <span className="text-left">{match.awayTeam.split(" ")[0]}</span>
         </div>
-        <StatRow label="Goals" home={match.homeScore} away={match.awayScore} />
-        <StatRow label="Red Cards" home={match.homeRedCards || "—"} away={match.awayRedCards || "—"} />
+        <StatRow label="Goles" home={match.homeScore} away={match.awayScore} />
+        <StatRow label="Tarj. Rojas" home={match.homeRedCards || "—"} away={match.awayRedCards || "—"} />
         <div className="pt-1 text-[10px] text-center text-muted-foreground/60">
-          Tap for full match center →
+          Ver centro de partido →
         </div>
       </div>
     </div>
@@ -130,18 +152,18 @@ export function LiveMatchesPanel() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <PulsingDot />
-            <CardTitle className="text-lg">Live Matches</CardTitle>
+            <CardTitle className="text-lg">Partidos en Vivo</CardTitle>
           </div>
           <div className="text-right">
             {lastUpdated && (
               <p className="text-xs text-muted-foreground">
-                Updated {lastUpdated.toLocaleTimeString()}
+                Actualizado {lastUpdated.toLocaleTimeString()}
               </p>
             )}
             {data && (
               <p className="text-[10px] text-muted-foreground/60">
-                API calls this month: {data.monthlyCallsUsed}/100
-                {data.source === "cache" && " · cached"}
+                Llamadas API este mes: {data.monthlyCallsUsed}/100
+                {data.source === "cache" && " · caché"}
               </p>
             )}
           </div>
@@ -153,14 +175,14 @@ export function LiveMatchesPanel() {
           <div className="flex items-center justify-center py-8">
             <div className="flex items-center gap-2 text-muted-foreground">
               <div className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-              <span className="text-sm">Loading live matches...</span>
+              <span className="text-sm">Cargando partidos en vivo...</span>
             </div>
           </div>
         )}
 
         {!loading && error && (
           <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">Could not load live data. Retrying in 30s.</p>
+            <p className="text-sm">No se pudo cargar datos en vivo. Reintentando en 30s.</p>
           </div>
         )}
 
@@ -168,9 +190,9 @@ export function LiveMatchesPanel() {
           <>
             {data.matches.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground text-sm">No live matches right now</p>
+                <p className="text-muted-foreground text-sm">Sin partidos en vivo ahora mismo</p>
                 <p className="text-xs text-muted-foreground/60 mt-1">
-                  Checks again in {Math.round(data.nextRefreshIn / 60)}m · auto-refreshes every 30s
+                  Próxima verificación en {Math.round(data.nextRefreshIn / 60)}m · se actualiza cada 30s
                 </p>
               </div>
             ) : (
