@@ -2,7 +2,9 @@ export type League = {
   code: string;
   name: string;
   country: string;
-  footballDataId: number;
+  region: string;           // e.g. "Europa", "México", "América del Sur"
+  footballDataId?: number;  // FD.org competition ID (free tier)
+  source: "football-data" | "coming-soon"; // which API provides data
 };
 
 export type MatchStatus = "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "CANCELLED";

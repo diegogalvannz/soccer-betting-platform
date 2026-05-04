@@ -28,104 +28,142 @@ type PickWithMatch = {
   }>;
 };
 
+/**
+ * Normalize a team name for fuzzy comparison.
+ * Strips FC/CF/SC suffixes, lowercases, collapses whitespace.
+ */
+function normalizeTeam(name: string | null | undefined): string {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .replace(/\b(fc|cf|sc|afc|bfc|fk|sk|sv|ac|as|ss|rc|cd|ud|cf|if|bk)\b/gi, "")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Returns true if selectionStr refers to teamName (or teamShort).
+ * Uses exact match after normalization, then first-word prefix check.
+ */
+function selectionMatchesTeam(
+  selectionStr: string,
+  teamName: string,
+  teamShort: string | null | undefined
+): boolean {
+  const sel = normalizeTeam(selectionStr);
+  const fullName = normalizeTeam(teamName);
+  const shortName = normalizeTeam(teamShort);
+
+  if (sel === fullName) return true;
+  if (shortName && sel === shortName) return true;
+
+  // First significant word of the team appears in selection, or vice versa
+  const firstWord = fullName.split(" ").find(w => w.length > 2) ?? "";
+  if (firstWord && sel.includes(firstWord)) return true;
+  if (firstWord && firstWord.length > 4 && fullName.includes(sel.split(" ")[0] ?? "")) return true;
+
+  // "Arsenal Win" / "Nottingham Forest Win" style
+  const stripped = sel.replace(/\bwin\b/g, "").trim();
+  if (stripped && (normalizeTeam(teamName).includes(stripped) || stripped.includes(normalizeTeam(teamName).split(" ")[0]))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Evaluate a pick against a final score.
+ * Returns "WON", "LOST", "VOID" (only for push/dead-heat), or null (= keep PENDING for manual review).
+ * NEVER returns VOID just because evaluation failed — that keeps picks reviewable.
+ */
 function decidePickResult(
   pick: PickWithMatch,
   homeScore: number,
   awayScore: number
-): "WON" | "LOST" | "VOID" {
+): "WON" | "LOST" | "VOID" | null {
   const { market, selection } = pick;
+  const sel = selection.trim();
   const totalGoals = homeScore + awayScore;
 
-  // 1X2 / Match Winner market
+  // ── 1X2 / Match Winner ────────────────────────────────────────────────────
   if (market === "1X2" || market === "Match Winner") {
-    if (selection.toLowerCase().includes("home") ||
-        selection === pick.match.homeTeam.shortName ||
-        selection === pick.match.homeTeam.name ||
-        selection.endsWith(" Win") && selection.includes(pick.match.homeTeam.name.split(" ")[0])) {
-      return homeScore > awayScore ? "WON" : "LOST";
-    }
-    if (selection === "Draw" || selection === "X") {
+    const selLower = sel.toLowerCase();
+
+    // Explicit draw
+    if (sel === "Draw" || sel === "X" || selLower === "empate") {
       return homeScore === awayScore ? "WON" : "LOST";
     }
-    if (selection.toLowerCase().includes("away") ||
-        selection === pick.match.awayTeam.shortName ||
-        selection === pick.match.awayTeam.name) {
-      return awayScore > homeScore ? "WON" : "LOST";
-    }
-    // Match team name in selection
-    if (selection.includes(pick.match.homeTeam.name.split(" ")[0])) {
+    // Explicit home/away keywords
+    if (selLower === "home" || selLower === "1") {
       return homeScore > awayScore ? "WON" : "LOST";
     }
-    if (selection.includes(pick.match.awayTeam.name.split(" ")[0])) {
+    if (selLower === "away" || selLower === "2") {
       return awayScore > homeScore ? "WON" : "LOST";
     }
-    // "Arsenal Win" style
-    if (selection.endsWith(" Win")) {
-      const teamPart = selection.replace(" Win", "").trim();
-      if (pick.match.homeTeam.name.includes(teamPart) || pick.match.homeTeam.shortName?.includes(teamPart)) {
-        return homeScore > awayScore ? "WON" : "LOST";
-      }
-      if (pick.match.awayTeam.name.includes(teamPart) || pick.match.awayTeam.shortName?.includes(teamPart)) {
-        return awayScore > homeScore ? "WON" : "LOST";
-      }
+
+    // Team name matching — home first, then away
+    if (selectionMatchesTeam(sel, pick.match.homeTeam.name, pick.match.homeTeam.shortName)) {
+      return homeScore > awayScore ? "WON" : "LOST";
     }
+    if (selectionMatchesTeam(sel, pick.match.awayTeam.name, pick.match.awayTeam.shortName)) {
+      return awayScore > homeScore ? "WON" : "LOST";
+    }
+
+    // Could not resolve — log and keep PENDING
+    console.warn(
+      `[Settler] Cannot match selection "${sel}" to either team (${pick.match.homeTeam.name} vs ${pick.match.awayTeam.name}) — keeping PENDING`
+    );
+    return null;
   }
 
-  // Over/Under market
-  if (market === "Over/Under") {
-    const match = selection.match(/([Oo]ver|[Uu]nder)\s+([\d.]+)/);
-    if (match) {
-      const direction = match[1].toLowerCase();
-      const line = parseFloat(match[2]);
+  // ── Over/Under ────────────────────────────────────────────────────────────
+  if (market === "Over/Under" || market === "Goals Over/Under") {
+    const m = sel.match(/([Oo]ver|[Uu]nder)\s*([\d.]+)/);
+    if (m) {
+      const direction = m[1].toLowerCase();
+      const line = parseFloat(m[2]);
       if (direction === "over") return totalGoals > line ? "WON" : totalGoals === line ? "VOID" : "LOST";
-      if (direction === "under") return totalGoals < line ? "WON" : totalGoals === line ? "VOID" : "LOST";
+      return totalGoals < line ? "WON" : totalGoals === line ? "VOID" : "LOST";
     }
-    // "Under 2.5 Goals" style
-    if (selection.toLowerCase().includes("under")) {
-      const lineMatch = selection.match(/([\d.]+)/);
-      if (lineMatch) {
-        const line = parseFloat(lineMatch[1]);
-        return totalGoals < line ? "WON" : totalGoals === line ? "VOID" : "LOST";
-      }
-    }
-    if (selection.toLowerCase().includes("over")) {
-      const lineMatch = selection.match(/([\d.]+)/);
-      if (lineMatch) {
-        const line = parseFloat(lineMatch[1]);
-        return totalGoals > line ? "WON" : totalGoals === line ? "VOID" : "LOST";
-      }
-    }
+    console.warn(`[Settler] Over/Under: cannot parse line from "${sel}" — keeping PENDING`);
+    return null;
   }
 
-  // BTTS (Both Teams to Score)
-  if (market === "Both Teams to Score") {
+  // ── BTTS ─────────────────────────────────────────────────────────────────
+  if (market === "Both Teams to Score" || market === "BTTS") {
     const bttsYes = homeScore > 0 && awayScore > 0;
-    if (selection.toLowerCase().includes("yes") || selection === "BTTS - Yes") {
-      return bttsYes ? "WON" : "LOST";
-    }
-    if (selection.toLowerCase().includes("no") || selection === "BTTS - No") {
-      return !bttsYes ? "WON" : "LOST";
-    }
+    const selLower = sel.toLowerCase();
+    if (selLower.includes("yes") || sel === "BTTS - Yes") return bttsYes ? "WON" : "LOST";
+    if (selLower.includes("no")  || sel === "BTTS - No")  return !bttsYes ? "WON" : "LOST";
+    console.warn(`[Settler] BTTS: unrecognised selection "${sel}" — keeping PENDING`);
+    return null;
   }
 
-  // Double Chance
+  // ── Double Chance ─────────────────────────────────────────────────────────
   if (market === "Double Chance") {
-    if (selection === "1X") return homeScore >= awayScore ? "WON" : "LOST";
-    if (selection === "X2") return awayScore >= homeScore ? "WON" : "LOST";
-    if (selection === "12") return homeScore !== awayScore ? "WON" : "LOST";
+    if (sel === "1X" || sel === "Home or Draw") return homeScore >= awayScore ? "WON" : "LOST";
+    if (sel === "X2" || sel === "Away or Draw") return awayScore >= homeScore ? "WON" : "LOST";
+    if (sel === "12" || sel === "Home or Away") return homeScore !== awayScore ? "WON" : "LOST";
+    console.warn(`[Settler] Double Chance: unrecognised selection "${sel}" — keeping PENDING`);
+    return null;
   }
 
-  // Asian Handicap — simplified
+  // ── Asian Handicap ────────────────────────────────────────────────────────
   if (market === "Asian Handicap") {
-    const match = selection.match(/([+-]?\d+\.?\d*)/);
-    if (match) {
-      const handicap = parseFloat(match[1]);
+    const m = sel.match(/([+-]?\d+\.?\d*)/);
+    if (m) {
+      const handicap = parseFloat(m[1]);
       const adjustedHome = homeScore + handicap;
       return adjustedHome > awayScore ? "WON" : adjustedHome === awayScore ? "VOID" : "LOST";
     }
+    console.warn(`[Settler] Asian Handicap: cannot parse handicap from "${sel}" — keeping PENDING`);
+    return null;
   }
 
-  return "VOID"; // Unknown market — void it
+  // ── Unknown market — do NOT void, keep PENDING for manual review ──────────
+  console.warn(`[Settler] Unknown market "${market}" for pick ${pick.id} — keeping PENDING`);
+  return null;
 }
 
 function calculateProfit(stake: number, odds: number, result: "WON" | "LOST" | "VOID"): number {
@@ -177,6 +215,12 @@ export async function settlePicks(): Promise<{
         homeScore,
         awayScore
       );
+
+      // null = evaluation failed — keep as PENDING for manual review
+      if (pickResult === null) {
+        skipped++;
+        continue;
+      }
 
       // Update pick status
       await prisma.pick.update({
@@ -384,4 +428,89 @@ export async function updateFinishedMatchScores(): Promise<void> {
       }
     }
   }
+}
+
+/**
+ * Re-evaluate all picks currently marked VOID against their match's final score.
+ * Corrects picks that were wrongly voided due to evaluation failures.
+ * A VOID from a cancelled/postponed match is kept as-is (match status ≠ FINISHED).
+ */
+export async function reEvaluateVoidPicks(): Promise<{
+  corrected: number;
+  kept: number;
+  errors: string[];
+}> {
+  let corrected = 0;
+  let kept = 0;
+  const errors: string[] = [];
+
+  const voidPicks = await prisma.pick.findMany({
+    where: {
+      status: "VOID",
+      match: { status: "FINISHED" }, // only finished matches — cancelled/postponed VOIDs are correct
+    },
+    include: {
+      match: {
+        include: {
+          homeTeam: { select: { name: true, shortName: true } },
+          awayTeam: { select: { name: true, shortName: true } },
+        },
+      },
+      bets: true,
+    },
+  });
+
+  console.log(`[Settler] Re-evaluating ${voidPicks.length} VOID picks from finished matches`);
+
+  for (const pick of voidPicks) {
+    try {
+      const homeScore = pick.match.homeScore;
+      const awayScore = pick.match.awayScore;
+      if (homeScore === null || awayScore === null) { kept++; continue; }
+
+      const newResult = decidePickResult(pick as unknown as PickWithMatch, homeScore, awayScore);
+
+      // null = still can't evaluate — keep VOID (it was wrongly voided, but we can't fix it automatically)
+      if (newResult === null || newResult === "VOID") { kept++; continue; }
+
+      // Correct the pick
+      await prisma.pick.update({
+        where: { id: pick.id },
+        data: { status: newResult, updatedAt: new Date() },
+      });
+
+      // Correct associated bets
+      for (const bet of pick.bets) {
+        const profit = calculateProfit(bet.stake, bet.odds, newResult);
+        await prisma.bet.update({
+          where: { id: bet.id },
+          data: { result: newResult, profit, settledAt: new Date() },
+        });
+        // Adjust bankroll
+        const betRecord = await prisma.bet.findUnique({
+          where: { id: bet.id },
+          select: { userId: true, stake: true },
+        });
+        if (betRecord) {
+          // Previous VOID returned stake, now we need to apply the real result
+          const bankrollAdjustment = newResult === "WON" ? profit : newResult === "LOST" ? -bet.stake : 0;
+          if (bankrollAdjustment !== 0) {
+            await prisma.user.update({
+              where: { id: betRecord.userId },
+              data: { bankrollCurrent: { increment: bankrollAdjustment } },
+            });
+          }
+        }
+      }
+
+      console.log(
+        `[Settler] Corrected VOID→${newResult} | ${pick.match.homeTeam.name} ${homeScore}-${awayScore} ${pick.match.awayTeam.name} | "${pick.selection}"`
+      );
+      corrected++;
+    } catch (err) {
+      errors.push(`Pick ${pick.id}: ${String(err)}`);
+    }
+  }
+
+  return { corrected, kept, errors };
 }
