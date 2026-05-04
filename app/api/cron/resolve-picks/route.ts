@@ -188,9 +188,14 @@ export async function GET(request: Request) {
           );
         }
 
-        // If not in today's fixtures, try fetching by externalId directly
+        // If not in today's fixtures, try fetching by externalId directly.
+        // Only do this for API-Football IDs (≥1,000,000) — old Football-Data.org IDs
+        // are smaller and would fetch wrong/unrelated fixtures from AF.
         if (!fixture && match.externalId && /^\d+$/.test(match.externalId)) {
-          fixture = await getFixtureById(parseInt(match.externalId, 10));
+          const numId = parseInt(match.externalId, 10);
+          if (numId >= 1_000_000) {
+            fixture = await getFixtureById(numId);
+          }
         }
 
         if (!fixture) {
