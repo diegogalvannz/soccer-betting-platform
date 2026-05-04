@@ -86,12 +86,14 @@ function MatchCard({ match, finished }: { match: SerializedMatch; finished?: boo
             ) : (
               <>
                 <span className="text-lg font-bold text-muted-foreground">vs</span>
-                {match.homeOdds && (
+                {match.homeOdds ? (
                   <div className="flex gap-1 mt-1">
                     <OddsChip val={match.homeOdds} />
                     {match.drawOdds && <OddsChip val={match.drawOdds} />}
                     {match.awayOdds && <OddsChip val={match.awayOdds} />}
                   </div>
+                ) : (
+                  <span className="text-[9px] text-muted-foreground/50 mt-1 text-center leading-tight">Cuotas próximamente</span>
                 )}
               </>
             )}
