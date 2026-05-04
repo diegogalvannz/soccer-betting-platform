@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { LiveMatch, LiveMatchesResponse } from "@/app/api/live-matches/route";
 
@@ -38,7 +39,8 @@ function RedCardBadge({ count }: { count: number }) {
 
 function LiveMatchCard({ match }: { match: LiveMatch }) {
   return (
-    <div className="border border-border rounded-xl p-4 bg-card hover:bg-accent/30 transition-colors">
+    <Link href={`/matches/live/${match.id}`} className="block">
+    <div className="border border-border rounded-xl p-4 bg-card hover:bg-accent/30 transition-colors cursor-pointer">
       {/* Header: live badge + minute */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -87,10 +89,11 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
         <StatRow label="Goals" home={match.homeScore} away={match.awayScore} />
         <StatRow label="Red Cards" home={match.homeRedCards || "—"} away={match.awayRedCards || "—"} />
         <div className="pt-1 text-[10px] text-center text-muted-foreground/60">
-          Detailed stats (shots, possession, fouls) available with paid API tier
+          Tap for full match center →
         </div>
       </div>
     </div>
+    </Link>
   );
 }
 

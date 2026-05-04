@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Target, TrendingUp, Calendar, Trophy } from "lucide-react";
+import { Target, TrendingUp, Calendar, Trophy, DollarSign } from "lucide-react";
 import { formatMatchDate, formatOdds } from "@/lib/utils";
 import Link from "next/link";
 import { LiveMatchesPanel } from "@/components/live/LiveMatchesPanel";
@@ -8,8 +8,20 @@ import { LiveMatchesPanel } from "@/components/live/LiveMatchesPanel";
 export const revalidate = 60;
 
 export default async function DashboardPage() {
-  const [pendingPicks, recentPicks, upcomingMatches, recentResults] = await Promise.all([
+  const now = new Date();
+  const next48h = new Date(now.getTime() + 48 * 3600000);
+
+  const [
+    pendingPicksCount,
+    recentPicks,
+    upcomingMatches,
+    allSettledPicks,
+    betStats,
+  ] = await Promise.all([
+    // Active (pending) picks
     prisma.pick.count({ where: { status: "PENDING" } }),
+
+    // Latest 5 pending picks with match details
     prisma.pick.findMany({
       where: { status: "PENDING" },
       include: {
@@ -23,8 +35,10 @@ export default async function DashboardPage() {
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
+
+    // Matches in next 48 hours
     prisma.match.findMany({
-      where: { status: "SCHEDULED", matchDate: { gt: new Date() } },
+      where: { status: "SCHEDULED", matchDate: { gt: now, lt: next48h } },
       include: {
         homeTeam: { select: { name: true, shortName: true } },
         awayTeam: { select: { name: true, shortName: true } },
@@ -32,15 +46,33 @@ export default async function DashboardPage() {
       orderBy: { matchDate: "asc" },
       take: 5,
     }),
+
+    // All settled picks for win rate
     prisma.pick.findMany({
       where: { status: { in: ["WON", "LOST"] } },
-      orderBy: { updatedAt: "desc" },
-      take: 10,
+      select: { status: true },
+    }),
+
+    // Bet profit/loss aggregate
+    prisma.bet.aggregate({
+      where: { result: { in: ["WON", "LOST"] } },
+      _sum: { profit: true, stake: true },
+      _count: { id: true },
     }),
   ]);
 
-  const wonCount = recentResults.filter((p: { status: string }) => p.status === "WON").length;
-  const winRate = recentResults.length > 0 ? Math.round((wonCount / recentResults.length) * 100) : 0;
+  // Compute stats
+  const totalSettled = allSettledPicks.length;
+  const wonCount = allSettledPicks.filter((p) => p.status === "WON").length;
+  const winRate = totalSettled > 0 ? Math.round((wonCount / totalSettled) * 100) : 0;
+
+  const totalProfit = betStats._sum.profit ?? 0;
+  const totalStaked = betStats._sum.stake ?? 0;
+  const roi = totalStaked > 0 ? Math.round((totalProfit / totalStaked) * 100) : 0;
+  const profitDisplay =
+    totalProfit === 0 ? "$0.00" :
+    totalProfit > 0 ? `+$${totalProfit.toFixed(2)}` :
+    `-$${Math.abs(totalProfit).toFixed(2)}`;
 
   return (
     <div className="space-y-8">
@@ -49,32 +81,40 @@ export default async function DashboardPage() {
         <p className="text-muted-foreground mt-1">Your betting intelligence overview</p>
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Stats Row — 5 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatCard
           title="Active Picks"
-          value={pendingPicks}
+          value={pendingPicksCount}
           icon={<Target className="h-4 w-4 text-muted-foreground" />}
           description="Awaiting results"
         />
         <StatCard
           title="Win Rate"
-          value={`${winRate}%`}
+          value={totalSettled > 0 ? `${winRate}%` : "—"}
           icon={<Trophy className="h-4 w-4 text-muted-foreground" />}
-          description="Last 10 settled picks"
+          description={totalSettled > 0 ? `${wonCount}W / ${totalSettled - wonCount}L` : "No settled picks yet"}
           highlight={winRate >= 55}
         />
         <StatCard
-          title="Upcoming Matches"
+          title="Upcoming"
           value={upcomingMatches.length}
           icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
           description="Next 48 hours"
         />
         <StatCard
           title="Total Picks"
-          value={pendingPicks + recentResults.length}
+          value={pendingPicksCount + totalSettled}
           icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
           description="All time"
+        />
+        <StatCard
+          title="Profit / ROI"
+          value={totalStaked > 0 ? profitDisplay : "—"}
+          icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          description={totalStaked > 0 ? `ROI: ${roi > 0 ? "+" : ""}${roi}%` : "No bets tracked yet"}
+          highlight={totalProfit > 0}
+          negative={totalProfit < 0}
         />
       </div>
 
@@ -85,7 +125,7 @@ export default async function DashboardPage() {
         {/* Current Picks */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Today&apos;s Picks</CardTitle>
+            <CardTitle className="text-lg">Active Picks</CardTitle>
             <Link href="/picks" className="text-sm text-primary hover:underline">
               View all
             </Link>
@@ -135,7 +175,7 @@ export default async function DashboardPage() {
                 No matches loaded — runs at 6am daily
               </p>
             ) : (
-              upcomingMatches.map((match) => (
+              upcomingMatches.map((match: typeof upcomingMatches[number]) => (
                 <Link key={match.id} href={`/matches/${match.id}`}>
                   <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors cursor-pointer">
                     <div>
@@ -165,14 +205,16 @@ export default async function DashboardPage() {
 }
 
 function StatCard({
-  title, value, icon, description, highlight,
+  title, value, icon, description, highlight, negative,
 }: {
   title: string;
   value: string | number;
   icon: React.ReactNode;
   description: string;
   highlight?: boolean;
+  negative?: boolean;
 }) {
+  const valueColor = highlight ? "text-green-500" : negative ? "text-red-400" : "";
   return (
     <Card>
       <CardContent className="pt-6">
@@ -180,7 +222,7 @@ function StatCard({
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
           {icon}
         </div>
-        <p className={`text-3xl font-bold ${highlight ? "text-green-500" : ""}`}>{value}</p>
+        <p className={`text-3xl font-bold ${valueColor}`}>{value}</p>
         <p className="text-xs text-muted-foreground mt-1">{description}</p>
       </CardContent>
     </Card>

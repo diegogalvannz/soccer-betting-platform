@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/ingest-matches",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/generate-picks",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/settle-picks",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
