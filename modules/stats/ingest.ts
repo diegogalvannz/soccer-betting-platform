@@ -8,6 +8,7 @@ import { TRACKED_LEAGUES, FOOTBALL_DATA_DELAY_MS } from "@/config/leagues";
 import { getUpcomingMatches, getRecentMatches } from "./football-data-client";
 import { sleep } from "@/lib/utils";
 import { FootballDataMatch } from "@/types";
+import { settlePicks } from "@/modules/engine/settler";
 
 function mapStatus(fdStatus: string): "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "CANCELLED" {
   const map: Record<string, "SCHEDULED" | "LIVE" | "FINISHED" | "POSTPONED" | "CANCELLED"> = {
@@ -115,6 +116,16 @@ export async function ingestUpcomingMatches(): Promise<{
       meta: { errors },
     },
   });
+
+  // Auto-settle: immediately resolve any pending picks whose matches just finished
+  try {
+    const settlement = await settlePicks();
+    if (settlement.settled > 0) {
+      console.log(`[Ingest] Auto-settled ${settlement.settled} picks after ingest`);
+    }
+  } catch (err) {
+    console.error("[Ingest] Auto-settle failed (non-fatal):", err);
+  }
 
   return { processed, errors };
 }

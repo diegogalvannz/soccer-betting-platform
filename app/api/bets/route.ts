@@ -19,13 +19,10 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("userId");
 
-  if (!userId) {
-    return NextResponse.json({ error: "userId required" }, { status: 400 });
-  }
-
   try {
+    // If no userId, return ALL bets (shared personal tracker)
     const bets = await prisma.bet.findMany({
-      where: { userId },
+      where: userId ? { userId } : undefined,
       include: {
         pick: {
           include: {

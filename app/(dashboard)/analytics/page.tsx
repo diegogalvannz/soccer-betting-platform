@@ -3,97 +3,291 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ROIChart } from "@/components/analytics/ROIChart";
-import { formatROI } from "@/lib/utils";
-import type { AnalyticsSummary } from "@/types";
+
+type AnalyticsData = {
+  totalPicks: number;
+  pendingPicks: number;
+  wonPicks: number;
+  lostPicks: number;
+  voidPicks: number;
+  pickWinRate: number;
+  totalBets: number;
+  wonBets: number;
+  lostBets: number;
+  pendingBets: number;
+  totalStaked: number;
+  totalProfit: number;
+  roi: number;
+  betWinRate: number;
+  monthlyBreakdown: Array<{
+    month: string;
+    bets: number;
+    won: number;
+    lost: number;
+    profit: number;
+    roi: number;
+  }>;
+  performanceCurve: Array<{
+    date: string;
+    cumulative: number;
+    result: string;
+  }>;
+  byLeague: Array<{ league: string; total: number; won: number; lost: number; winRate: number }>;
+  byMarket: Array<{ market: string; total: number; won: number; lost: number; winRate: number }>;
+};
+
+function fmtROI(roi: number) {
+  return `${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`;
+}
+
+function fmtProfit(p: number) {
+  return `${p >= 0 ? "+" : ""}$${Math.abs(p).toFixed(2)}`;
+}
+
+function KPICard({
+  label, value, sub, positive, negative,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  positive?: boolean;
+  negative?: boolean;
+}) {
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className={`text-2xl font-bold mt-1 ${positive ? "text-green-400" : negative ? "text-red-400" : ""}`}>
+          {value}
+        </p>
+        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Simple bar for league/market win rates
+function WinRateBar({ won, total }: { won: number; total: number }) {
+  const pct = total > 0 ? Math.round((won / total) * 100) : 0;
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full ${pct >= 55 ? "bg-green-500" : pct >= 45 ? "bg-yellow-500" : "bg-red-500"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className={`text-xs font-mono w-10 text-right ${pct >= 55 ? "text-green-400" : pct >= 45 ? "text-yellow-400" : "text-red-400"}`}>
+        {pct}%
+      </span>
+    </div>
+  );
+}
+
+// Simple cumulative performance chart using SVG sparkline
+function PerformanceSpark({ curve }: { curve: AnalyticsData["performanceCurve"] }) {
+  if (curve.length < 2) return null;
+  const vals = curve.map((c) => c.cumulative);
+  const min = Math.min(...vals, 0);
+  const max = Math.max(...vals, 1);
+  const range = max - min || 1;
+  const W = 600, H = 80;
+  const pts = curve.map((c, i) => {
+    const x = (i / (curve.length - 1)) * W;
+    const y = H - ((c.cumulative - min) / range) * H;
+    return `${x},${y}`;
+  });
+  const isPositive = vals[vals.length - 1] >= 0;
+
+  return (
+    <div className="w-full overflow-hidden rounded-lg">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none" style={{ height: 80 }}>
+        <defs>
+          <linearGradient id="curveGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={isPositive ? "#22c55e" : "#ef4444"} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={isPositive ? "#22c55e" : "#ef4444"} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polyline
+          points={pts.join(" ")}
+          fill="none"
+          stroke={isPositive ? "#22c55e" : "#ef4444"}
+          strokeWidth="2"
+        />
+        <polygon
+          points={`0,${H} ${pts.join(" ")} ${W},${H}`}
+          fill="url(#curveGrad)"
+        />
+      </svg>
+    </div>
+  );
+}
 
 export default function AnalyticsPage() {
-  const [data, setData] = useState<AnalyticsSummary | null>(null);
+  const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const userId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
-
   useEffect(() => {
-    if (!userId) { setLoading(false); return; }
-    fetch(`/api/analytics?userId=${userId}`)
+    fetch("/api/analytics")
       .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); });
-  }, [userId]);
-
-  if (!userId) {
-    return <div className="flex items-center justify-center h-64 text-muted-foreground">Sign in to view analytics</div>;
-  }
+      .then((d) => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading...</div>;
-  }
-
-  if (!data || data.totalBets === 0) {
     return (
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold">Analytics</h1>
-          <p className="text-muted-foreground mt-1">Your betting performance over time</p>
+      <div className="space-y-8 animate-pulse">
+        <div className="h-8 w-48 bg-muted rounded" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-muted rounded-xl" />)}
         </div>
-        <Card>
-          <CardContent className="py-16 text-center text-muted-foreground">
-            No settled bets yet. Log bets and mark them as won/lost to see analytics.
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
-  const roiColor = data.roi >= 0 ? "text-green-400" : "text-red-400";
-  const profitColor = data.totalProfit >= 0 ? "text-green-400" : "text-red-400";
+  if (!data) {
+    return <div className="text-center py-16 text-muted-foreground">Failed to load analytics</div>;
+  }
+
+  const hasData = data.totalPicks > 0;
+  const profitPositive = data.totalProfit >= 0;
+  const roiPositive    = data.roi >= 0;
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold">Analytics</h1>
-        <p className="text-muted-foreground mt-1">Your betting performance over time</p>
+        <p className="text-muted-foreground mt-1">Global app performance across all picks and bets</p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard label="ROI" value={formatROI(data.roi)} color={roiColor} sub="Return on investment" />
-        <KPICard label="Win Rate" value={`${data.winRate}%`} color={data.winRate >= 50 ? "text-green-400" : "text-red-400"} sub={`${data.wonBets}W / ${data.lostBets}L`} />
-        <KPICard label="Total P&L" value={`${data.totalProfit >= 0 ? "+" : ""}$${data.totalProfit}`} color={profitColor} sub={`$${data.totalStaked} staked`} />
-        <KPICard label="Bankroll" value={`$${data.bankrollCurrent?.toFixed(2) ?? "—"}`} sub={`Started at $${data.bankrollStart}`} />
-      </div>
+      {/* Pick KPIs */}
+      <section>
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Pick Engine Performance</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KPICard label="Total Picks Generated" value={String(data.totalPicks)} sub={`${data.pendingPicks} still pending`} />
+          <KPICard
+            label="Pick Win Rate"
+            value={data.wonPicks + data.lostPicks > 0 ? `${data.pickWinRate}%` : "—"}
+            sub={`${data.wonPicks}W · ${data.lostPicks}L · ${data.voidPicks} void`}
+            positive={data.pickWinRate >= 55}
+            negative={data.pickWinRate > 0 && data.pickWinRate < 45}
+          />
+          <KPICard label="Won" value={String(data.wonPicks)} positive={data.wonPicks > 0} />
+          <KPICard label="Lost" value={String(data.lostPicks)} negative={data.lostPicks > 0} />
+        </div>
+      </section>
 
-      {/* Bet counts */}
-      <div className="grid grid-cols-3 gap-4">
-        <StatBlock label="Total Bets" value={data.totalBets} />
-        <StatBlock label="Won" value={data.wonBets} color="text-green-400" />
-        <StatBlock label="Pending" value={data.pendingBets} color="text-blue-400" />
-      </div>
+      {/* Bet KPIs */}
+      <section>
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Betting Performance</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KPICard
+            label="Total P&L"
+            value={data.totalBets > 0 ? (profitPositive ? `+$${data.totalProfit.toFixed(2)}` : `-$${Math.abs(data.totalProfit).toFixed(2)}`) : "—"}
+            sub={data.totalBets > 0 ? `$${data.totalStaked.toFixed(2)} staked` : "No bets yet"}
+            positive={profitPositive && data.totalBets > 0}
+            negative={!profitPositive && data.totalBets > 0}
+          />
+          <KPICard
+            label="ROI"
+            value={data.totalBets > 0 ? fmtROI(data.roi) : "—"}
+            sub="Return on investment"
+            positive={roiPositive && data.totalBets > 0}
+            negative={!roiPositive && data.totalBets > 0}
+          />
+          <KPICard
+            label="Bet Win Rate"
+            value={data.wonBets + data.lostBets > 0 ? `${data.betWinRate}%` : "—"}
+            sub={`${data.wonBets}W · ${data.lostBets}L`}
+            positive={data.betWinRate >= 50}
+          />
+          <KPICard label="Total Bets" value={String(data.totalBets)} sub={`${data.pendingBets} pending`} />
+        </div>
+      </section>
 
-      {/* Monthly Chart */}
-      {data.monthlyBreakdown.length > 0 && (
+      {/* Performance curve */}
+      {data.performanceCurve.length >= 2 && (
         <Card>
           <CardHeader>
-            <CardTitle>Monthly P&L</CardTitle>
+            <CardTitle>Pick Performance Curve</CardTitle>
           </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground mb-3">Cumulative units won/lost over time (+1 per win, -1 per loss)</p>
+            <PerformanceSpark curve={data.performanceCurve} />
+            <div className="flex justify-between text-xs text-muted-foreground mt-2">
+              <span>Start</span>
+              <span className={data.performanceCurve.at(-1)!.cumulative >= 0 ? "text-green-400 font-medium" : "text-red-400 font-medium"}>
+                {data.performanceCurve.at(-1)!.cumulative >= 0 ? "+" : ""}{data.performanceCurve.at(-1)!.cumulative} units
+              </span>
+              <span>Now</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Monthly chart */}
+      {data.monthlyBreakdown.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>Monthly P&L</CardTitle></CardHeader>
           <CardContent>
             <ROIChart data={data.monthlyBreakdown} />
           </CardContent>
         </Card>
       )}
 
-      {/* Monthly Table */}
+      {/* By league + by market side by side */}
+      {hasData && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* By league */}
+          {data.byLeague.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Performance by League</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {data.byLeague.map((l) => (
+                  <div key={l.league}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium truncate">{l.league}</span>
+                      <span className="text-xs text-muted-foreground ml-2 shrink-0">{l.won}/{l.total}</span>
+                    </div>
+                    <WinRateBar won={l.won} total={l.total} />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* By market */}
+          {data.byMarket.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Performance by Market</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {data.byMarket.map((m) => (
+                  <div key={m.market}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium">{m.market}</span>
+                      <span className="text-xs text-muted-foreground ml-2">{m.won}/{m.total} · {m.winRate}%</span>
+                    </div>
+                    <WinRateBar won={m.won} total={m.total} />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Monthly breakdown table */}
       {data.monthlyBreakdown.length > 0 && (
         <Card>
-          <CardHeader><CardTitle>Monthly Breakdown</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Monthly Breakdown</CardTitle></CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-2 text-muted-foreground font-medium">Month</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium">Bets</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium">W/L</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium">P&L</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium">ROI</th>
+                    {["Month", "Bets", "W/L", "P&L", "ROI"].map((h) => (
+                      <th key={h} className={`py-2 font-medium text-muted-foreground ${h === "Month" ? "text-left" : "text-right"}`}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -103,10 +297,10 @@ export default function AnalyticsPage() {
                       <td className="text-right py-2">{row.bets}</td>
                       <td className="text-right py-2">{row.won}/{row.lost}</td>
                       <td className={`text-right py-2 font-mono ${row.profit >= 0 ? "text-green-400" : "text-red-400"}`}>
-                        {row.profit >= 0 ? "+" : ""}${row.profit}
+                        {fmtProfit(row.profit)}
                       </td>
                       <td className={`text-right py-2 ${row.roi >= 0 ? "text-green-400" : "text-red-400"}`}>
-                        {formatROI(row.roi)}
+                        {fmtROI(row.roi)}
                       </td>
                     </tr>
                   ))}
@@ -116,29 +310,15 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       )}
+
+      {!hasData && (
+        <Card>
+          <CardContent className="py-16 text-center text-muted-foreground">
+            <p>No picks generated yet.</p>
+            <p className="text-xs mt-2">Analytics will populate as picks are generated and results settled.</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
-  );
-}
-
-function KPICard({ label, value, color = "", sub }: { label: string; value: string; color?: string; sub?: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
-        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
-      </CardContent>
-    </Card>
-  );
-}
-
-function StatBlock({ label, value, color = "" }: { label: string; value: number; color?: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6 text-center">
-        <p className={`text-3xl font-bold ${color}`}>{value}</p>
-        <p className="text-sm text-muted-foreground mt-1">{label}</p>
-      </CardContent>
-    </Card>
   );
 }

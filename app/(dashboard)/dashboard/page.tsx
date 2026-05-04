@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Target, TrendingUp, Calendar, Trophy, DollarSign } from "lucide-react";
+import { Target, TrendingUp, Calendar, Trophy, DollarSign, ChevronRight } from "lucide-react";
 import { formatMatchDate, formatOdds } from "@/lib/utils";
 import Link from "next/link";
 import { LiveMatchesPanel } from "@/components/live/LiveMatchesPanel";
@@ -81,13 +81,14 @@ export default async function DashboardPage() {
         <p className="text-muted-foreground mt-1">Your betting intelligence overview</p>
       </div>
 
-      {/* Stats Row — 5 cards */}
+      {/* Stats Row — 5 clickable cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatCard
           title="Active Picks"
           value={pendingPicksCount}
           icon={<Target className="h-4 w-4 text-muted-foreground" />}
           description="Awaiting results"
+          href="/picks?status=PENDING"
         />
         <StatCard
           title="Win Rate"
@@ -95,18 +96,21 @@ export default async function DashboardPage() {
           icon={<Trophy className="h-4 w-4 text-muted-foreground" />}
           description={totalSettled > 0 ? `${wonCount}W / ${totalSettled - wonCount}L` : "No settled picks yet"}
           highlight={winRate >= 55}
+          href="/analytics"
         />
         <StatCard
           title="Upcoming"
           value={upcomingMatches.length}
           icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
           description="Next 48 hours"
+          href="/matches?filter=upcoming"
         />
         <StatCard
           title="Total Picks"
           value={pendingPicksCount + totalSettled}
           icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
           description="All time"
+          href="/picks"
         />
         <StatCard
           title="Profit / ROI"
@@ -115,6 +119,7 @@ export default async function DashboardPage() {
           description={totalStaked > 0 ? `ROI: ${roi > 0 ? "+" : ""}${roi}%` : "No bets tracked yet"}
           highlight={totalProfit > 0}
           negative={totalProfit < 0}
+          href="/analytics"
         />
       </div>
 
@@ -205,7 +210,7 @@ export default async function DashboardPage() {
 }
 
 function StatCard({
-  title, value, icon, description, highlight, negative,
+  title, value, icon, description, highlight, negative, href,
 }: {
   title: string;
   value: string | number;
@@ -213,20 +218,29 @@ function StatCard({
   description: string;
   highlight?: boolean;
   negative?: boolean;
+  href?: string;
 }) {
   const valueColor = highlight ? "text-green-500" : negative ? "text-red-400" : "";
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          {icon}
-        </div>
-        <p className={`text-3xl font-bold ${valueColor}`}>{value}</p>
-        <p className="text-xs text-muted-foreground mt-1">{description}</p>
-      </CardContent>
-    </Card>
+  const inner = (
+    <CardContent className="pt-6 pb-5">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        {href ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" /> : icon}
+      </div>
+      <p className={`text-3xl font-bold ${valueColor}`}>{value}</p>
+      <p className="text-xs text-muted-foreground mt-1">{description}</p>
+    </CardContent>
   );
+  if (href) {
+    return (
+      <Link href={href}>
+        <Card className="hover:bg-accent/40 hover:border-primary/30 transition-colors cursor-pointer">
+          {inner}
+        </Card>
+      </Link>
+    );
+  }
+  return <Card>{inner}</Card>;
 }
 
 function ConfidenceBadge({ score }: { score: number }) {

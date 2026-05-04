@@ -2,7 +2,7 @@
  * Pick generation pipeline.
  * For each upcoming match, fetches stats and runs the scorer.
  * Saves qualifying picks to the DB.
- * Called by /api/cron/generate-picks daily at 8am.
+ * Called by /api/cron/generate-picks daily at 11:59pm — generates picks for tomorrow's matches.
  */
 import { prisma } from "@/lib/prisma";
 import { scoreMatch } from "./scorer";
@@ -35,14 +35,21 @@ export async function generatePicks(): Promise<{
   skipped: number;
   errors: string[];
 }> {
+  // Target tomorrow's matches: from midnight tonight to midnight the day after tomorrow
+  const now = new Date();
+  const tomorrowStart = new Date(now);
+  tomorrowStart.setUTCHours(24, 0, 0, 0); // tomorrow midnight UTC
+  const tomorrowEnd = new Date(tomorrowStart);
+  tomorrowEnd.setUTCHours(tomorrowStart.getUTCHours() + 24); // day after tomorrow midnight UTC
+
+  // Also allow matches in the next 48h as fallback (in case run slightly off schedule)
   const cutoffTime = new Date(Date.now() + PICKS_CUTOFF_HOURS * 3600000);
-  const lookAhead = new Date(Date.now() + 48 * 3600000);
 
   // Get upcoming matches without picks already
   const matches = await prisma.match.findMany({
     where: {
       status: "SCHEDULED",
-      matchDate: { gt: new Date(), lt: lookAhead },
+      matchDate: { gte: tomorrowStart, lt: tomorrowEnd },
       picks: { none: {} },
     },
     include: { homeTeam: true, awayTeam: true },
