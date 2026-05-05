@@ -19,7 +19,38 @@ import { settlePicks } from "@/modules/engine/settler";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SEASON = new Date().getFullYear();
+const NOW   = new Date();
+const YEAR  = NOW.getFullYear();
+const MONTH = NOW.getMonth() + 1; // 1-12
+
+/**
+ * European leagues use a split season that starts in August.
+ *   Aug–Dec of YEAR  → season = YEAR    (e.g. Aug 2025 = season 2025)
+ *   Jan–Jul of YEAR  → season = YEAR-1  (e.g. May 2026 = season 2025)
+ *
+ * Calendar-year leagues (Americas, Middle East, etc.) always use YEAR.
+ */
+const EU_SEASON   = MONTH >= 8 ? YEAR : YEAR - 1;  // 2025 during May 2026
+const CAL_SEASON  = YEAR;                            // 2026 during May 2026
+
+/** Leagues that follow a calendar year (season = current year) */
+const CALENDAR_YEAR_LEAGUE_IDS = new Set<number>([
+  LEAGUE_IDS.LIGA_MX,
+  LEAGUE_IDS.MLS,
+  LEAGUE_IDS.BRASILEIRAO,
+  LEAGUE_IDS.LIGA_ARGENTINA,
+  LEAGUE_IDS.COPA_LIBERTADORES,
+  LEAGUE_IDS.COPA_SUDAMERICANA,
+  LEAGUE_IDS.SAUDI_PRO_LEAGUE,
+  LEAGUE_IDS.UAE_PRO_LEAGUE,
+  LEAGUE_IDS.LEAGUES_CUP,
+  LEAGUE_IDS.CONCACAF_CHAMPIONS,
+  LEAGUE_IDS.GOLD_CUP,
+]);
+
+function seasonFor(leagueId: number): number {
+  return CALENDAR_YEAR_LEAGUE_IDS.has(leagueId) ? CAL_SEASON : EU_SEASON;
+}
 
 /** All league IDs we track (24 leagues) */
 const ALL_LEAGUE_IDS = Object.values(LEAGUE_IDS) as number[];
@@ -129,10 +160,11 @@ export async function ingestUpcomingMatches(): Promise<{
     await Promise.all(
       batch.map(async (leagueId) => {
         try {
-          console.log(`[Ingest] Fetching ${LEAGUE_NAMES[leagueId] ?? leagueId} (${fromDate} → ${toDate})...`);
+          const season = seasonFor(leagueId);
+          console.log(`[Ingest] Fetching ${LEAGUE_NAMES[leagueId] ?? leagueId} season=${season} (${fromDate}→${toDate})`);
           const fixtures = await getFixturesByDateRange(
             leagueId,
-            SEASON,
+            season,
             fromDate,
             toDate
           );
