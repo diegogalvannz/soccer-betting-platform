@@ -36,6 +36,7 @@ type MatchWithTeams = {
   homeTeam: { name: string; shortName: string | null };
   awayTeam: { name: string; shortName: string | null };
   league: string;
+  leagueCode: string;
   matchDate: Date;
   homeOdds: number | null;
   drawOdds: number | null;
@@ -150,17 +151,20 @@ export default async function MatchesPage() {
         picks: { select: { id: true, status: true, selection: true, confidenceScore: true } },
       },
       orderBy: { matchDate: "asc" },
-      take: 100,
+      take: 300,
     }),
     prisma.match.findMany({
-      where: { status: "FINISHED" },
+      where: {
+        status: "FINISHED",
+        matchDate: { gte: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000) },
+      },
       include: {
         homeTeam: { select: { name: true, shortName: true } },
         awayTeam: { select: { name: true, shortName: true } },
         picks: { select: { id: true, status: true, selection: true, confidenceScore: true } },
       },
       orderBy: { matchDate: "desc" },
-      take: 40,
+      take: 150,
     }),
   ]);
 
