@@ -11,11 +11,14 @@
 import { prisma } from "@/lib/prisma";
 import {
   getFixturesByDateRange,
+  getExpandedOdds,
   LEAGUE_IDS,
   LEAGUE_NAMES,
   AFFixture,
 } from "./api-football-client";
 import { settlePicks } from "@/modules/engine/settler";
+import { sleep } from "@/lib/utils";
+import { FOOTBALL_DATA_DELAY_MS } from "@/config/leagues";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -138,6 +141,62 @@ function dateStr(offsetDays: number): string {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + offsetDays);
   return d.toISOString().slice(0, 10);
+}
+
+// ─── Odds refresh ─────────────────────────────────────────────────────────────
+
+/**
+ * For every SCHEDULED match in the next 32 hours without odds,
+ * fetch 1X2 + expanded odds from API-Football and update the DB.
+ * Called after fixture ingest so the picker has real market odds to work with.
+ */
+export async function refreshOddsForUpcomingMatches(): Promise<{ updated: number; skipped: number }> {
+  const now = new Date();
+  const windowEnd = new Date(now.getTime() + 32 * 3600_000);
+
+  // Only matches without 1X2 odds that are in our pick window
+  const matches = await prisma.match.findMany({
+    where: {
+      status:    "SCHEDULED",
+      matchDate: { gte: now, lt: windowEnd },
+      homeOdds:  null,
+    },
+    select: { id: true, externalId: true, homeTeam: { select: { name: true } }, awayTeam: { select: { name: true } } },
+    take: 30,
+  });
+
+  let updated = 0, skipped = 0;
+
+  for (const match of matches) {
+    const fixtureId = parseInt(match.externalId, 10);
+    if (isNaN(fixtureId)) { skipped++; continue; }
+
+    try {
+      const odds = await getExpandedOdds(fixtureId);
+      if (!odds.homeOdds && !odds.awayOdds) { skipped++; continue; }
+
+      await prisma.match.update({
+        where: { id: match.id },
+        data: {
+          homeOdds:     odds.homeOdds,
+          drawOdds:     odds.drawOdds,
+          awayOdds:     odds.awayOdds,
+          rawOddsCache: odds as unknown as import("@prisma/client").Prisma.InputJsonValue,
+          oddsUpdatedAt: new Date(),
+        },
+      });
+      updated++;
+      console.log(`[OddsRefresh] ${match.homeTeam.name} vs ${match.awayTeam.name}: H=${odds.homeOdds} D=${odds.drawOdds} A=${odds.awayOdds}`);
+    } catch (err) {
+      console.error(`[OddsRefresh] Error for match ${match.id}:`, err);
+      skipped++;
+    }
+
+    await sleep(FOOTBALL_DATA_DELAY_MS);
+  }
+
+  console.log(`[OddsRefresh] Updated ${updated} matches, skipped ${skipped}`);
+  return { updated, skipped };
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
