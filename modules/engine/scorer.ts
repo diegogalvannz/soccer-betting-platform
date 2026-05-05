@@ -415,7 +415,13 @@ function scoreGoalsOverUnder(s: MultiMarketStats): ScoreResult[] {
   const xGAway  = (awayGoals.scored + homeGoals.conceded) / 2;
   const xGTotal = xGHome + xGAway;
 
-  const results: ScoreResult[] = [];
+  // Collect qualifying candidates per direction, then pick ONE per direction.
+  // Preference: lines with odds in 1.50–1.95 decimal (-113 to -105 American).
+  // Only take a higher-odds line if its edge is ≥50% better than the preferred alternative.
+  type OUCandidate = { line: number; odds: number; edge: number; conf: number; prob: number; dir: "OVER" | "UNDER" };
+
+  const overCandidates:  OUCandidate[] = [];
+  const underCandidates: OUCandidate[] = [];
 
   // Prioritize the most informative lines: 1.5, 2.5, 3.5
   const targetLines = [1.5, 2.5, 3.5];
@@ -426,33 +432,75 @@ function scoreGoalsOverUnder(s: MultiMarketStats): ScoreResult[] {
     const pOver  = probOverGoals(xGTotal, line.line);
     const pUnder = 1 - pOver;
 
-    // Try OVER
     const edgeOver = edgeVsMarket(pOver, line.overOdds);
     const confOver = Math.round(Math.min(90, 55 + edgeOver * 300));
     if (edgeOver >= MIN_VALUE_EDGE && line.overOdds >= MIN_DECIMAL_ODDS && confOver >= 62) {
-      results.push({
-        pick: "OVER", market: "Goles Over/Under", selection: `Más de ${line.line} goles`,
-        decimalOdds: line.overOdds, americanOdds: decimalToAmerican(line.overOdds),
-        confidenceScore: confOver,
-        reasoning: buildOUGoalsReasoning("OVER", s, line.line, xGTotal, pOver, edgeOver, confOver, line.overOdds),
-        sentimentSummary: null,
-        componentScores: { form: Math.round(formScore(s.homeForm)*100), headToHead: 50, homeAway: 50, oddsValue: Math.round((edgeOver/0.08)*50+30), sentiment: 50, news: 50 },
-      });
+      overCandidates.push({ line: line.line, odds: line.overOdds, edge: edgeOver, conf: confOver, prob: pOver, dir: "OVER" });
     }
 
-    // Try UNDER
     const edgeUnder = edgeVsMarket(pUnder, line.underOdds);
     const confUnder = Math.round(Math.min(90, 55 + edgeUnder * 300));
     if (edgeUnder >= MIN_VALUE_EDGE && line.underOdds >= MIN_DECIMAL_ODDS && confUnder >= 62) {
-      results.push({
-        pick: "UNDER", market: "Goles Over/Under", selection: `Menos de ${line.line} goles`,
-        decimalOdds: line.underOdds, americanOdds: decimalToAmerican(line.underOdds),
-        confidenceScore: confUnder,
-        reasoning: buildOUGoalsReasoning("UNDER", s, line.line, xGTotal, pUnder, edgeUnder, confUnder, line.underOdds),
-        sentimentSummary: null,
-        componentScores: { form: Math.round(formScore(s.awayForm)*100), headToHead: 50, homeAway: 50, oddsValue: Math.round((edgeUnder/0.08)*50+30), sentiment: 50, news: 50 },
-      });
+      underCandidates.push({ line: line.line, odds: line.underOdds, edge: edgeUnder, conf: confUnder, prob: pUnder, dir: "UNDER" });
     }
+  }
+
+  // Preference scorer: favor odds between 1.50–1.95 (the -150 to -105 American range).
+  // Score = edge × bonus, where bonus is 1.5 for preferred range, 1.0 elsewhere.
+  function preferenceScore(c: OUCandidate): number {
+    const preferred = c.odds >= 1.50 && c.odds <= 1.95;
+    return c.edge * (preferred ? 1.5 : 1.0);
+  }
+
+  // Select best candidate per direction using preference score.
+  // Only override the preferred-range pick with a higher-odds pick if its raw edge
+  // is at least 50% better (guards against chasing +EV that's mostly noise).
+  function selectBest(candidates: OUCandidate[]): OUCandidate | null {
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) return candidates[0];
+
+    // Sort by preference score descending
+    const sorted = [...candidates].sort((a, b) => preferenceScore(b) - preferenceScore(a));
+    const best = sorted[0];
+
+    // If the best pick is already in the preferred range, use it.
+    if (best.odds >= 1.50 && best.odds <= 1.95) return best;
+
+    // Otherwise check if any preferred-range candidate exists and is close enough in edge.
+    const preferredAlt = candidates.find(c => c.odds >= 1.50 && c.odds <= 1.95);
+    if (preferredAlt && best.edge < preferredAlt.edge * 1.5) {
+      // The higher-odds pick isn't meaningfully better — use the safer line instead.
+      return preferredAlt;
+    }
+
+    return best;
+  }
+
+  const results: ScoreResult[] = [];
+
+  const bestOver  = selectBest(overCandidates);
+  const bestUnder = selectBest(underCandidates);
+
+  if (bestOver) {
+    results.push({
+      pick: "OVER", market: "Goles Over/Under", selection: `Más de ${bestOver.line} goles`,
+      decimalOdds: bestOver.odds, americanOdds: decimalToAmerican(bestOver.odds),
+      confidenceScore: bestOver.conf,
+      reasoning: buildOUGoalsReasoning("OVER", s, bestOver.line, xGTotal, bestOver.prob, bestOver.edge, bestOver.conf, bestOver.odds),
+      sentimentSummary: null,
+      componentScores: { form: Math.round(formScore(s.homeForm)*100), headToHead: 50, homeAway: 50, oddsValue: Math.round((bestOver.edge/0.08)*50+30), sentiment: 50, news: 50 },
+    });
+  }
+
+  if (bestUnder) {
+    results.push({
+      pick: "UNDER", market: "Goles Over/Under", selection: `Menos de ${bestUnder.line} goles`,
+      decimalOdds: bestUnder.odds, americanOdds: decimalToAmerican(bestUnder.odds),
+      confidenceScore: bestUnder.conf,
+      reasoning: buildOUGoalsReasoning("UNDER", s, bestUnder.line, xGTotal, bestUnder.prob, bestUnder.edge, bestUnder.conf, bestUnder.odds),
+      sentimentSummary: null,
+      componentScores: { form: Math.round(formScore(s.awayForm)*100), headToHead: 50, homeAway: 50, oddsValue: Math.round((bestUnder.edge/0.08)*50+30), sentiment: 50, news: 50 },
+    });
   }
 
   return results;
