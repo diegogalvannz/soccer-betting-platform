@@ -5,32 +5,35 @@ export { MIN_CONFIDENCE_THRESHOLD, MIN_DECIMAL_ODDS, SCORING_WEIGHTS };
 /** Minimum edge (our prob vs implied prob) required to flag as value */
 export const MIN_VALUE_EDGE = 0.04;
 
-/**
- * Confidence bands.
- * MEDIUM floor raised to 70 — matches MIN_CONFIDENCE_THRESHOLD.
- * Any pick below 70 is SKIP; there is no "acceptable with caveats" tier.
- */
+/** Confidence bands */
 export const CONFIDENCE_BANDS = {
-  HIGH: 80,    // Strong pick — recommend confidently
-  MEDIUM: 70,  // Acceptable — recommend with confidence
+  HIGH: 75,    // Strong pick — recommend confidently
+  MEDIUM: 62,  // Acceptable — recommend with confidence
   LOW: 0,      // Skip — do not recommend
 } as const;
 
 /**
- * Minimum completed H2H fixtures required to generate a pick.
- * Prevents picks where we have no reliable head-to-head history.
- */
-export const MIN_H2H_MATCHES = 3;
-
-/**
- * Minimum completed recent fixtures required per team to generate a pick.
- * Guards against neutral form fallback [1,1,1,1,1] being used for scoring.
+ * Minimum recent completed fixtures required per team.
+ * Guards against scoring with no real form data.
  */
 export const MIN_FORM_MATCHES = 4;
 
 /**
- * Max picks generated per cron run.
- * Raised from 5 → 10 so quality gates (not the cap) are what limits output.
+ * Target minimum picks per daily run.
+ * If fewer than this are generated at primary threshold (62),
+ * the picker will do a second pass at FALLBACK_CONFIDENCE_THRESHOLD.
+ */
+export const MIN_PICKS_PER_RUN = 3;
+
+/**
+ * Fallback confidence threshold used only when the daily minimum
+ * hasn't been met after the primary pass.
+ */
+export const FALLBACK_CONFIDENCE_THRESHOLD = 60;
+
+/**
+ * Max picks generated per cron run (cap, not target).
+ * Quality gates, not this number, are what limits output on good days.
  */
 export const MAX_PICKS_PER_RUN = 10;
 

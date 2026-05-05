@@ -190,10 +190,10 @@ export const MIN_DECIMAL_ODDS = 1.5;
 
 /**
  * Minimum confidence score required to save a pick.
- * Raised from 62 → 70 after quality audit (2026-05-04).
- * Zero picks is better than a low-quality pick.
+ * Primary threshold: 62. Fallback threshold: 60 (used only when fewer than
+ * MIN_PICKS_PER_RUN picks have been generated to meet the daily minimum).
  */
-export const MIN_CONFIDENCE_THRESHOLD = 70;
+export const MIN_CONFIDENCE_THRESHOLD = 62;
 
 export const SCORING_WEIGHTS = {
   form: 0.30,

@@ -146,8 +146,8 @@ async function apiFetch<T = unknown>(
   const res = await fetch(url, {
     headers: headers(),
     cache: opts?.cache ?? "no-store",
-    // @ts-expect-error next revalidate
-    next: opts?.next,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    next: opts?.next as any,
   });
 
   if (!res.ok) {
@@ -244,13 +244,12 @@ export type ParsedOdds = { home: number | null; draw: number | null; away: numbe
 
 export async function getMatchOdds(fixtureId: number): Promise<ParsedOdds> {
   const data = await apiFetch<AFOdds>(`/odds?fixture=${fixtureId}`, {
-    next: { revalidate: 3600 },  // cache odds for 1 hour
+    next: { revalidate: 3600 },
   });
 
   const empty: ParsedOdds = { home: null, draw: null, away: null };
   if (!data.response[0]) return empty;
 
-  // Find "Match Winner" bet (bet id=1) from any bookmaker
   for (const bk of data.response[0].bookmakers) {
     const mw = bk.bets.find((b) => b.id === 1 || b.name === "Match Winner");
     if (!mw) continue;
@@ -264,6 +263,136 @@ export async function getMatchOdds(fixtureId: number): Promise<ParsedOdds> {
     };
   }
   return empty;
+}
+
+// ─── Expanded odds — all markets in one call ──────────────────────────────────
+
+export type OverUnderLine = {
+  line: number;
+  overOdds: number;
+  underOdds: number;
+};
+
+export type ExpandedOdds = {
+  // 1X2
+  homeOdds:    number | null;
+  drawOdds:    number | null;
+  awayOdds:    number | null;
+  // Double Chance
+  dc1xOdds:    number | null; // Home or Draw
+  dcX2Odds:    number | null; // Away or Draw
+  dc12Odds:    number | null; // Home or Away
+  // BTTS
+  bttsYesOdds: number | null;
+  bttsNoOdds:  number | null;
+  // Goals Over/Under (all lines found)
+  goalsLines:  OverUnderLine[];
+  // Cards Over/Under (if available)
+  cardsLines:  OverUnderLine[];
+};
+
+function parseOddsValue(values: Array<{ value: string; odd: string }>, label: string): number | null {
+  const v = values.find((x) => x.value.toLowerCase() === label.toLowerCase());
+  if (!v) return null;
+  const n = parseFloat(v.odd);
+  return isNaN(n) ? null : n;
+}
+
+function parseOverUnderLines(
+  values: Array<{ value: string; odd: string }>
+): OverUnderLine[] {
+  const lines: Map<number, { over?: number; under?: number }> = new Map();
+
+  for (const v of values) {
+    // e.g. "Over 2.5" or "Under 2.5"
+    const m = v.value.match(/^(Over|Under)\s+(\d+\.?\d*)/i);
+    if (!m) continue;
+    const direction = m[1].toLowerCase();
+    const line      = parseFloat(m[2]);
+    const odd       = parseFloat(v.odd);
+    if (isNaN(line) || isNaN(odd)) continue;
+
+    if (!lines.has(line)) lines.set(line, {});
+    const entry = lines.get(line)!;
+    if (direction === "over")  entry.over  = odd;
+    else                       entry.under = odd;
+  }
+
+  return Array.from(lines.entries())
+    .filter(([, e]) => e.over !== undefined && e.under !== undefined)
+    .map(([line, e]) => ({ line, overOdds: e.over!, underOdds: e.under! }))
+    .sort((a, b) => a.line - b.line);
+}
+
+/**
+ * Fetches all available odds markets for a fixture in a single API call.
+ * Extracts: 1X2, Double Chance, BTTS, Goals Over/Under, Cards Over/Under.
+ */
+export async function getExpandedOdds(fixtureId: number): Promise<ExpandedOdds> {
+  const empty: ExpandedOdds = {
+    homeOdds: null, drawOdds: null, awayOdds: null,
+    dc1xOdds: null, dcX2Odds: null, dc12Odds: null,
+    bttsYesOdds: null, bttsNoOdds: null,
+    goalsLines: [], cardsLines: [],
+  };
+
+  let data: Awaited<ReturnType<typeof apiFetch<AFOdds>>>;
+  try {
+    data = await apiFetch<AFOdds>(`/odds?fixture=${fixtureId}`, {
+      next: { revalidate: 3600 },
+    });
+  } catch {
+    return empty;
+  }
+
+  if (!data.response[0]) return empty;
+
+  const result = { ...empty };
+
+  for (const bk of data.response[0].bookmakers) {
+    for (const bet of bk.bets) {
+      const name = bet.name.toLowerCase();
+      const vals = bet.values;
+
+      // 1X2 Match Winner
+      if ((bet.id === 1 || name.includes("match winner")) && result.homeOdds === null) {
+        result.homeOdds = parseOddsValue(vals, "Home");
+        result.drawOdds = parseOddsValue(vals, "Draw");
+        result.awayOdds = parseOddsValue(vals, "Away");
+      }
+
+      // Double Chance
+      if ((bet.id === 4 || name.includes("double chance")) && result.dc1xOdds === null) {
+        result.dc1xOdds = parseOddsValue(vals, "Home/Draw") ?? parseOddsValue(vals, "1X");
+        result.dcX2Odds = parseOddsValue(vals, "Draw/Away") ?? parseOddsValue(vals, "X2");
+        result.dc12Odds = parseOddsValue(vals, "Home/Away") ?? parseOddsValue(vals, "12");
+      }
+
+      // Both Teams Score
+      if ((bet.id === 8 || name.includes("both teams") || name.includes("btts")) && result.bttsYesOdds === null) {
+        result.bttsYesOdds = parseOddsValue(vals, "Yes");
+        result.bttsNoOdds  = parseOddsValue(vals, "No");
+      }
+
+      // Goals Over/Under
+      if (
+        (bet.id === 5 || name.includes("goals over") || name === "goals over/under") &&
+        result.goalsLines.length === 0
+      ) {
+        result.goalsLines = parseOverUnderLines(vals);
+      }
+
+      // Cards Over/Under (bet id varies by bookmaker — scan by name)
+      if (
+        (name.includes("card") && (name.includes("over") || name.includes("under") || name.includes("total"))) &&
+        result.cardsLines.length === 0
+      ) {
+        result.cardsLines = parseOverUnderLines(vals);
+      }
+    }
+  }
+
+  return result;
 }
 
 // ─── Team recent form (last N fixtures) ──────────────────────────────────────

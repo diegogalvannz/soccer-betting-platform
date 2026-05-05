@@ -80,7 +80,7 @@ export type AnalyticsSummary = {
 };
 
 export type ScoreResult = {
-  pick: "HOME" | "DRAW" | "AWAY" | "SKIP";
+  pick: "HOME" | "DRAW" | "AWAY" | "OVER" | "UNDER" | "BTTS_YES" | "BTTS_NO" | "DC_1X" | "DC_X2" | "DC_12" | "CARDS_OVER" | "CARDS_UNDER" | "SKIP";
   market: string;
   selection: string;
   decimalOdds: number;
