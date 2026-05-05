@@ -187,7 +187,13 @@ export const REGIONS = Object.keys(LEAGUES_BY_REGION);
 // ─── Betting constants ────────────────────────────────────────────────────────
 export const MIN_AMERICAN_ODDS = -200;
 export const MIN_DECIMAL_ODDS = 1.5;
-export const MIN_CONFIDENCE_THRESHOLD = 62;
+
+/**
+ * Minimum confidence score required to save a pick.
+ * Raised from 62 → 70 after quality audit (2026-05-04).
+ * Zero picks is better than a low-quality pick.
+ */
+export const MIN_CONFIDENCE_THRESHOLD = 70;
 
 export const SCORING_WEIGHTS = {
   form: 0.30,
